@@ -5,11 +5,9 @@ import (
 	"net/http"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/like-mike/relai-gateway/metrics"
 	providerpkg "github.com/like-mike/relai-gateway/provider"
 )
-
-// Prometheus metrics
-var ()
 
 // ChatCompletionRequest represents the JSON body for chat completions.
 type ChatCompletionRequest struct {
@@ -36,6 +34,8 @@ func RegisterRoutes(app *fiber.App, provider providerpkg.CompletionProvider) {
 			return c.Status(fiber.StatusInternalServerError).SendString("error fetching chat completion: " + err.Error())
 		}
 		// Token counting (simple heuristic: word count)
+		tokenCount := float64(len(resp.Text) / 4)
+		metrics.LlmTokens.WithLabelValues(c.OriginalURL()).Observe(tokenCount)
 		return c.JSON(CompletionsResponse{Text: resp.Text})
 	})
 }
