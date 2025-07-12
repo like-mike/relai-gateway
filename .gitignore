@@ -14,3 +14,5 @@
 # IDE settings
 .vscode/
 /.idea/
+
+infra/

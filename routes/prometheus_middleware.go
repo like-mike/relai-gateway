@@ -17,7 +17,7 @@ func PrometheusMiddleware() fiber.Handler {
 		code := c.Response().StatusCode()
 		status := fmt.Sprintf("%d", code)
 
-		fmt.Printf("PrometheusMiddleware: route=%s, status=%s, latency=%.4f\n", route, status, latency)
+		// fmt.Printf("PrometheusMiddleware: route=%s, status=%s, latency=%.4f\n", route, status, latency)
 
 		metrics.HttpRequestsTotal.WithLabelValues(status, route).Inc()
 		metrics.HttpRequestDurationSeconds.WithLabelValues(route).Observe(latency)
