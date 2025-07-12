@@ -1,78 +1,48 @@
-# RelAI – The Go-Native LLM Gateway
+# relai-gateway
 
-RelAI: - Go-native LLM gateway built for infra teams.
+A simple, extensible Go API gateway for LLM completions.
 
----
+## Overview
 
-## 🚀 Why RelAI?
+This service provides a `/completions` endpoint that delegates to a pluggable LLM provider (default: OpenAI).
 
-Most AI proxies are:
-- Slow (Python-based)
-- Messy (bad prompt control)
-- Opaque (no metrics or logs)
-- Expensive (vendor lock-in, no caching)
+## Setup
 
-**RelAI** solves that by being:
-- 🧠 **LLM-native** – Routes OpenAI, Anthropic, etc.
-- ⚡ **Fast as hell** – Built in Go, optimized for streaming
-- 🔐 **Enterprise-ready** – Azure AD OAuth, RBAC, Redis
-- 📊 **Fully observable** – Prometheus, Grafana, OpenTelemetry
-- 🧼 **Prompt-aware** – Middleware for logging, redaction, rewrites
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/like-mike/relai-gateway.git
+   cd relai-gateway
+   ```
+2. Set required environment variables:
+   ```bash
+   export OPENAI_API_KEY=your_api_key
+   export OPENAI_MODEL=text-davinci-003      # Optional, defaults to text-davinci-003
+   export LLM_PROVIDER=openai                # Optional, default provider
+   ```
++  Alternatively, create a `.env` file in the project root with these variables; it will be loaded automatically and is included in .gitignore.
 
----
+## Run
 
-## 🧱 Roadmap
+Start the server on port 8080:
+```bash
+go run main.go
+```
 
-### ✅ MVP Goals (Week 1)
-- [x] Go + Fiber backend scaffold
-- [x] `/v1/chat/completions` endpoint proxy
-- [x] Support OpenAI-style streaming (`stream: true`)
-- [x] Redis token cache + request logging
-- [x] Basic metrics via Prometheus
-- [x] HTMX-powered UI for viewing API keys (stub)
-- [x] Azure OAuth login (stubbed)
-- [x] Admin/User role separation (basic RBAC)
+POST JSON to `http://localhost:8080/completions`:
+```json
+{
+  "prompt": "Hello, world!",
+  "max_tokens": 50
+}
+```
 
-### 🔜 Short-Term Goals
-- [ ] Prompt middleware system (PII redaction, rewriting, logging)
-- [ ] Multi-provider routing (OpenAI, Anthropic, Mistral)
-- [ ] YAML config (models, providers, tokens, limits)
-- [ ] Rate limiting + per-org quotas
-- [ ] Token usage + cost dashboard
-- [ ] Org-aware RBAC and scoping
+## Extensibility
 
-### 🧠 Stretch Goals
-- [ ] Fallback logic (e.g. OpenAI failover to Anthropic)
-- [ ] UI for logs, token usage, cost projection
-- [ ] Pluggable backends (Ollama, Bedrock, Azure, etc.)
-- [ ] Hosted OSS edition with managed UI
+- Define new LLM providers by implementing the `CompletionProvider` interface.
+- Add provider initialization logic in `provider_factory.go`.
 
----
+## Testing
 
-## ⚙️ Stack
-
-| Layer | Tech |
-|-------|------|
-| Backend | Go + Fiber |
-| UI | HTMX + Tailwind |
-| Auth | Azure OAuth + AD Groups |
-| Cache / RBAC | Redis |
-| Observability | Prometheus + Grafana + OpenTelemetry |
-| Config | YAML (TBD) |
-
----
-
-## 🧠 Philosophy
-
-RelAI is being built:
-- In public (eventually open source)
-- For real-world internal use
-- With production needs in mind (auth, caching, metrics, prompt safety)
-
----
-
-## 📣 Status
-
-RelAI is in **early development**.  
-
-Stay tuned.  
+Run unit tests:
+```bash
+go test ./...
