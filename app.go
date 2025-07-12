@@ -24,6 +24,8 @@ func main() {
 	}
 
 	app := fiber.New()
+	// Add Prometheus metrics middleware
+	app.Use(routes.PrometheusMiddleware())
 	// Add HTTP logging middleware
 	app.Use(logger.New())
 	// Expose Prometheus metrics at /metrics
