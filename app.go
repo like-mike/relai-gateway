@@ -5,22 +5,15 @@ import (
 	"log"
 	"os"
 
-	"github.com/gofiber/contrib/otelfiber"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/adaptor"
-	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
-	"github.com/like-mike/relai-gateway/provider"
 	"github.com/like-mike/relai-gateway/routes"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
-	"google.golang.org/grpc"
-
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	"google.golang.org/grpc"
 )
 
 func init() {
@@ -38,29 +31,16 @@ func main() {
 		}
 	}()
 
-	provider, err := provider.NewProviderFromEnv()
-	if err != nil {
-		log.Fatalf("Failed to create provider: %v", err)
-	}
-
-	app := fiber.New(fiber.Config{DisableStartupMessage: true})
-	// Add OpenTelemetry tracing middleware
-	app.Use(otelfiber.Middleware())
-	// Add Prometheus metrics middleware
-	app.Use(routes.PrometheusMiddleware())
-	// Add HTTP logging middleware
-	app.Use(logger.New())
-	// Expose Prometheus metrics at /metrics
-	app.Get("/metrics", adaptor.HTTPHandler(promhttp.Handler()))
-	app.Get("/health", routes.HealthHandler)
-	routes.RegisterRoutes(app, provider)
+	r := routes.SetupRouter()
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	log.Println("Starting server on :" + port)
-	log.Fatal(app.Listen(":" + port))
+	log.Println("Starting RelAI server on :" + port)
+	if err := r.Run(":" + port); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func initTracer() *sdktrace.TracerProvider {
