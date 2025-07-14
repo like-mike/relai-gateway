@@ -8,7 +8,7 @@ import (
 // SetupRouter initializes the Gin router and attaches handlers and middleware.
 func SetupRouter() *gin.Engine {
 	r := gin.New()
-	r.Use(gin.Logger())
+	r.Use(middleware.CustomLogger())
 	r.Use(gin.Recovery())
 
 	// Prometheus metrics endpoint
