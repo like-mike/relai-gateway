@@ -1,0 +1,10 @@
+{
+    "model": "gpt-3.5-turbo",
+    "messages": [
+        {
+            "role": "user",
+            "content": "Write a detailed essay about the history of artificial intelligence, including major milestones, key figures, and future trends. Make it at least 1000 words."
+        }
+    ],
+    "stream": true
+}
