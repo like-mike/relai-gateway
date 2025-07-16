@@ -19,6 +19,3 @@ services:
       context: loadtest
       dockerfile: Dockerfile
     container_name: dummy-backend
-    environment:
-      - USE_DUMMY_BACKEND=1
-    entrypoint: ["sh", "-c", "if [ \"$USE_DUMMY_BACKEND\" = \"1\" ]; then ./dummy-backend; else sleep infinity; fi"]
