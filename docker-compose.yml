@@ -21,8 +21,8 @@ services:
     depends_on:
       - relai1
       - relai2
-      - relai3
-      - relai4
+      # - relai3
+      # - relai4
 
   relai1:
     <<: *relai-base
@@ -32,13 +32,13 @@ services:
     <<: *relai-base
     container_name: relai-gateway-2
 
-  relai3:
-    <<: *relai-base
-    container_name: relai-gateway-3
+  # relai3:
+  #   <<: *relai-base
+  #   container_name: relai-gateway-3
 
-  relai4:
-    <<: *relai-base
-    container_name: relai-gateway-4
+  # relai4:
+  #   <<: *relai-base
+  #   container_name: relai-gateway-4
 
   dummy-backend:
     build:
