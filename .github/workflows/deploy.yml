@@ -25,6 +25,6 @@ jobs:
 
       - name: Deploy via SSH
         run: |
-          ssh -i ~/.ssh/id_ed25519 root@$DROPLET_IP << 'EOF'
+          ssh --t -i ~/.ssh/id_ed25519 root@$DROPLET_IP << 'EOF'
             echo hello world
           EOF
