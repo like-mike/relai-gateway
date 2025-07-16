@@ -25,6 +25,9 @@ jobs:
 
       - name: Deploy via SSH
         run: |
-          ssh -tt -i ~/.ssh/id_ed25519 root@$DROPLET_IP << 'EOF'
-            echo hello world
+          ssh -i ~/.ssh/id_ed25519 root@$DROPLET_IP << 'EOF'
+            cd ~/app/relai-gateway
+            git pull origin main
+            docker compose down
+            docker compose up -d --build
           EOF
