@@ -1,4 +1,4 @@
-name: Deploy to DigitalOcean Droplet
+name: Deploy to DigitalOcean
 
 on:
   push:
@@ -9,20 +9,22 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    env:
+      DROPLET_IP: ${{ secrets.DROPLET_IP }}
 
-    - name: Deploy via SSH
-      uses: appleboy/ssh-action@v0.1.10
-      with:
-        host: ${{ secrets.DROPLET_HOST }}
-        username: ${{ secrets.DROPLET_USERNAME }}
-        key: ${{ secrets.DEPLOY_KEY }}
-        script: |
-          set -e
-          cd /root/app/relai-gateway
-          git pull origin main
-          docker-compose down
-          docker-compose pull
-          docker-compose up -d --build
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H $DROPLET_IP >> ~/.ssh/known_hosts
+
+      - name: Deploy via SSH
+        run: |
+          ssh -i ~/.ssh/id_ed25519 root@$DROPLET_IP << 'EOF'
+            echo hello world
+          EOF
