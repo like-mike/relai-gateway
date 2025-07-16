@@ -20,5 +20,5 @@ services:
       dockerfile: Dockerfile
     container_name: dummy-backend
     environment:
-      - DUMMY_BACKEND=1
+      - USE_DUMMY_BACKEND=1
     entrypoint: ["sh", "-c", "if [ \"$USE_DUMMY_BACKEND\" = \"1\" ]; then ./dummy-backend; else sleep infinity; fi"]
