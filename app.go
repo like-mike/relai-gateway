@@ -44,25 +44,14 @@ func main() {
 	r.Use(middleware.PrometheusMiddleware())
 	r.Use(middleware.TracingMiddleware())
 
-	// Protected group for all other routes
-	protected := r.Group("/")
-	protected.Use(middleware.AuthMiddlewareGin())
-	protected.GET("/v1/models", models.Handler)
-	protected.GET("/models", models.Handler)
+	// Auth middleware for all other routes
+	r.Use(middleware.AuthMiddlewareGin())
 
-	// Fallback proxy route for all undefined HTTP requests (protected)
-	r.NoRoute(func(c *gin.Context) {
-		// Only allow health and metrics endpoints unauthenticated
-		if c.Request.URL.Path == "/health" || c.Request.URL.Path == "/metrics" {
-			proxy.Handler(c)
-			return
-		}
-		// Require auth for all other undefined routes
-		middleware.AuthMiddlewareGin()(c)
-		if !c.IsAborted() {
-			proxy.Handler(c)
-		}
-	})
+	r.GET("/v1/models", models.Handler)
+	r.GET("/models", models.Handler)
+
+	// Fallback proxy route for all undefined HTTP requests
+	r.NoRoute(proxy.Handler)
 
 	port := os.Getenv("PORT")
 	if port == "" {
