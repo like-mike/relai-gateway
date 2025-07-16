@@ -1,18 +1,46 @@
+version: '3.8'
+
+x-relai-base: &relai-base
+  build:
+    context: .
+    dockerfile: Dockerfile
+  env_file:
+    - .env
+  command: ./relai-gateway
+  environment:
+    - USE_DUMMY_BACKEND=1
+  depends_on:
+    - dummy-backend
+
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: relai-gateway-app
+  nginx:
+    image: nginx:alpine
+    container_name: relai-gateway-lb
     ports:
-      - "8080:8080"
-    env_file:
-      - .env
-    command: ./relai-gateway
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - dummy-backend
-    environment:
-      - USE_DUMMY_BACKEND=1
+      - relai1
+      - relai2
+      - relai3
+      - relai4
+
+  relai1:
+    <<: *relai-base
+    container_name: relai-gateway-1
+
+  relai2:
+    <<: *relai-base
+    container_name: relai-gateway-2
+
+  relai3:
+    <<: *relai-base
+    container_name: relai-gateway-3
+
+  relai4:
+    <<: *relai-base
+    container_name: relai-gateway-4
 
   dummy-backend:
     build:
