@@ -37,15 +37,18 @@ func main() {
 	r.Use(middleware.CustomLogger())
 	r.Use(gin.Recovery())
 
+	// Public endpoints
 	r.GET("/health", health.Handler)
-	r.GET("/v1/models", models.Handler)
-	r.GET("/models", models.Handler)
 
+	// Metrics endpoint (assuming /metrics is handled in prometheus middleware)
 	r.Use(middleware.PrometheusMiddleware())
 	r.Use(middleware.TracingMiddleware())
 
-	// Models endpoint
-	// r.GET("/models", models.Handler)
+	// Auth middleware for all other routes
+	r.Use(middleware.AuthMiddlewareGin())
+
+	r.GET("/v1/models", models.Handler)
+	r.GET("/models", models.Handler)
 
 	// Fallback proxy route for all undefined HTTP requests
 	r.NoRoute(proxy.Handler)

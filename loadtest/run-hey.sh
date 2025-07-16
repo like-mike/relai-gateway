@@ -2,7 +2,7 @@
 # Usage: ./run-hey.sh http://localhost:8080/your-endpoint 100 30 50
 # Arguments: <url> <rps> <duration_seconds> <concurrency>
 
-URL=${1:-http://localhost:8081/v1/chat/completions}
+URL=${1:-http://146.190.116.201:8080/v1/chat/completions}
 RPS=${2:-1000}
 DURATION=${3:-50}
 CONCURRENCY=${4:-50}
