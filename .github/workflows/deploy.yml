@@ -17,6 +17,7 @@ jobs:
       uses: appleboy/ssh-action@v0.1.10
       with:
         host: ${{ secrets.DROPLET_HOST }}
+        username: ${{ secrets.DROPLET_USERNAME }}
         key: ${{ secrets.DEPLOY_KEY }}
         script: |
           set -e
