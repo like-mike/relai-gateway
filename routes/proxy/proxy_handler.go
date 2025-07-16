@@ -11,6 +11,16 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
+var sharedClient = &http.Client{
+	Timeout: 60 * time.Second, // optional
+	Transport: &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 100,
+		IdleConnTimeout:     90 * time.Second,
+		DisableCompression:  false,
+	},
+}
+
 func Handler(c *gin.Context) {
 	ctx := c.Request.Context()
 	tracer := otel.GetTracerProvider().Tracer("gateway")
@@ -43,8 +53,8 @@ func Handler(c *gin.Context) {
 
 	// Send request
 	start := time.Now()
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	// client := &http.Client{}
+	resp, err := sharedClient.Do(req)
 	duration := time.Since(start).Milliseconds()
 	spanInvoke.SetAttributes(attribute.Int64("llm.request.duration_ms", duration))
 

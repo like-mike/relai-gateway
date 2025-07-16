@@ -1,5 +1,3 @@
-version: '3.8'
-
 x-relai-base: &relai-base
   build:
     context: .
