@@ -26,7 +26,7 @@ cat > prompt.json <<EOF
 }
 EOF
 
-hey -z ${DURATION}s -q $RPS -c $CONCURRENCY -m POST -H "Content-Type: application/json" -D prompt.json $URL
+hey -z ${DURATION}s -q $RPS -c $CONCURRENCY -m POST -H "Content-Type: application/json" -H "Authorization: Bearer changeme" -D prompt.json $URL
 
 
 # Extract p50 and p95 latency in seconds, then convert to milliseconds
