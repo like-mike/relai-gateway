@@ -12,7 +12,7 @@ services:
     depends_on:
       - dummy-backend
     environment:
-      - USE_DUMMY_BACKEND=1
+      - USE_DUMMY_BACKEND=0
 
   dummy-backend:
     build:
