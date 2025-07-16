@@ -1,0 +1,24 @@
+services:
+  locust-master:
+    image: locustio/locust
+    ports:
+      - "8089:8089"
+    command: >
+      -f /mnt/locust/locustfile.py
+      --master
+      --host=http://146.190.116.201:8080
+    volumes:
+      - .:/mnt/locust
+
+  locust-worker:
+    image: locustio/locust
+    depends_on:
+      - locust-master
+    command: >
+      -f /mnt/locust/locustfile.py
+      --worker
+      --master-host=locust-master
+    volumes:
+      - .:/mnt/locust
+    deploy:
+      replicas: 10  # adjust for scale
