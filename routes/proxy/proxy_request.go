@@ -3,7 +3,6 @@ package proxy
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -40,12 +39,14 @@ func prepareRequest(cfg *provider.ProxyConfig, c *gin.Context, target string) (*
 		}
 	}
 
-	body, _ := io.ReadAll(c.Request.Body)
+	// body, _ := io.ReadAll(c.Request.Body)
 
-	modelName, err := DetectModel(body)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to detect model: %w", err)
-	}
+	// modelName, err := DetectModel(body)
+	// if err != nil {
+	// 	return nil, nil, fmt.Errorf("failed to detect model: %w", err)
+	// }
+
+	modelName := "gpt-4.1"
 
 	model := provider.ModelMap[modelName]
 
