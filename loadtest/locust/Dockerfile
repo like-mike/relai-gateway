@@ -4,4 +4,4 @@ WORKDIR /mnt/locust
 
 RUN pip install --no-cache-dir locust
 
-CMD ["locust", "-f", "locustfile.py", "--processes", "8"]
+CMD ["locust", "-f", "locustfile.py", "--processes", "16"]
