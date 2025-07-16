@@ -28,6 +28,7 @@ jobs:
           ssh -i ~/.ssh/id_ed25519 root@$DROPLET_IP << 'EOF'
             cd ~/app/relai-gateway
             git pull origin main
+            docker compose pull
             docker compose down
             docker compose up -d --build
           EOF
