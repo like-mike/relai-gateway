@@ -1,7 +1,7 @@
 from locust import HttpUser, task, between
 
 class MyUser(HttpUser):
-    wait_time = between(1, 5)
+    wait_time = between(0, 0)
 
     @task
     def chat_completion(self):
