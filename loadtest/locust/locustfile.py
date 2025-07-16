@@ -1,17 +1,21 @@
 from locust import HttpUser, task, between
 
-class ChatUser(HttpUser):
+class MyUser(HttpUser):
     wait_time = between(1, 5)
 
     @task
     def chat_completion(self):
         headers = {
-            "Authorization": "Bearer changeme",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Authorization": "Bearer changeme"
         }
-        self.client.post("/v1/chat/completions", json={
+
+        payload = {
             "model": "gpt-3.5-turbo",
             "messages": [
-                {"role": "user", "content": "Hello"}
+                {"role": "system", "content": "You are a chat bot."},
+                {"role": "user", "content": "Hello, how are you?"}
             ]
-        }, headers=headers)
+        }
+
+        self.client.post("/v1/chat/completions", json=payload, headers=headers)
