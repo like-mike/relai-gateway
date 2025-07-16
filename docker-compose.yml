@@ -33,8 +33,8 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     ports:
-      - "4317:4317"
-      - "4318:4318"
+      # - "4317:4317"
+      # - "4318:4318"
       - "55681:55681"
     volumes:
       - ./otel-collector-config.yml:/etc/otelcol-contrib/config.yaml

@@ -14,12 +14,12 @@ import (
 	"github.com/like-mike/relai-gateway/routes/proxy"
 )
 
-func init() {
-	os.Setenv("OTEL_SERVICE_NAME", "relai-gateway")
-	os.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
-	os.Setenv("OTEL_TRACES_SAMPLER", "always_on")
+// func init() {
+// 	os.Setenv("OTEL_SERVICE_NAME", "relai-gateway")
+// 	os.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+// 	os.Setenv("OTEL_TRACES_SAMPLER", "always_on")
 
-}
+// }
 
 func main() {
 	// Load environment variables from .env file
