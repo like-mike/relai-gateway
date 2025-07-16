@@ -23,7 +23,7 @@ func prepareRequest(cfg *provider.ProxyConfig, c *gin.Context, target string) (*
 	var baseURL string
 	if dummyBackend == "1" {
 		log.Println("Using dummy backend for testing")
-		baseURL = "http://localhost:2000"
+		baseURL = "http://dummy-backend:2000"
 	} else {
 		// config := provider.NewProxyConfigFromEnv("openai")
 		baseURL = cfg.BaseURL

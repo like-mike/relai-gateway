@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   app:
     build:
@@ -11,3 +9,17 @@ services:
     env_file:
       - .env
     command: ./relai-gateway
+    depends_on:
+      - dummy-backend
+    environment:
+      - USE_DUMMY_BACKEND=${USE_DUMMY_BACKEND}
+
+  dummy-backend:
+    build:
+      context: loadtest
+      dockerfile: Dockerfile
+    container_name: dummy-backend
+    environment:
+      - DUMMY_BACKEND=1
+      - USE_DUMMY_BACKEND=${USE_DUMMY_BACKEND}
+    entrypoint: ["sh", "-c", "if [ \"$USE_DUMMY_BACKEND\" = \"1\" ]; then ./dummy-backend; else sleep infinity; fi"]
