@@ -21,4 +21,4 @@ services:
     volumes:
       - .:/mnt/locust
     deploy:
-      replicas: 25
+      replicas: 10
