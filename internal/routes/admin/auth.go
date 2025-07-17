@@ -13,9 +13,8 @@ import (
 )
 
 const (
-	sessionCookieName = "session"
-	defaultAdminUser  = "admin"
-	defaultAdminPass  = "admin"
+	defaultAdminUser = "admin"
+	defaultAdminPass = "admin"
 )
 
 // AuthConfig holds authentication configuration.
@@ -41,8 +40,8 @@ func LoadAuthConfig() AuthConfig {
 }
 
 // setSessionCookie sets the session cookie.
-func setSessionCookie(c *gin.Context, value string, maxAge int) {
-	c.SetCookie(sessionCookieName, value, maxAge, "/", "", false, true)
+func setSessionCookie(c *gin.Context, key, value string, maxAge int) {
+	c.SetCookie(key, value, maxAge, "/", "", false, true)
 }
 
 // RegisterAuthRoutes registers authentication-related routes.
@@ -50,7 +49,7 @@ func RegisterAuthRoutes(router gin.IRoutes, config AuthConfig) {
 	// Only register /admin/logout on authorized group
 	if group, ok := router.(*gin.RouterGroup); ok {
 		group.GET("/admin/logout", func(c *gin.Context) {
-			setSessionCookie(c, "", -1)
+			setSessionCookie(c, "session", "", -1)
 			logoutURL := "https://login.microsoftonline.com/" + config.AzureTenantID + "/oauth2/v2.0/logout" +
 				"?post_logout_redirect_uri=" + config.AzureRedirectURI
 			c.Redirect(http.StatusFound, logoutURL)
@@ -87,7 +86,7 @@ func RegisterPublicAuthRoutes(router gin.IRoutes, config AuthConfig) {
 		password := c.PostForm("password")
 
 		if config.EnableLocalLogin && username == adminUser && password == adminPass {
-			setSessionCookie(c, "dummy-session", 3600)
+			setSessionCookie(c, "session", "dummy-session", 3600)
 			c.Redirect(http.StatusFound, "/admin")
 			return
 		}
@@ -153,13 +152,17 @@ func RegisterPublicAuthRoutes(router gin.IRoutes, config AuthConfig) {
 			return
 		}
 		email, _ := claims["email"].(string)
-		if email == "" {
-			c.String(http.StatusUnauthorized, "Email not found in Azure token")
-			return
-		}
+		name, _ := claims["name"].(string)
+		oid, _ := claims["oid"].(string)
+
+		setSessionCookie(c, "email", email, 3600)
+		setSessionCookie(c, "name", name, 3600)
+		setSessionCookie(c, "oid", oid, 3600)
+
 		// TODO: Validate JWT signature with Azure public keys for production
-		// Store user email in session cookie for dropdown display
-		setSessionCookie(c, email, 3600)
+
+		setSessionCookie(c, "session", "dummy-session", 3600)
+
 		c.Redirect(http.StatusFound, "/admin")
 	})
 }
