@@ -29,19 +29,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to get token: %v", err)
 	}
-
-	fmt.Println(token)
-
 	// Call Graph API
-	// err = getGroups(token)
-	// if err != nil {
-	// 	log.Fatalf("Failed to get groups: %v", err)
-	// }
-
-	err = getUserGroups(token, "dc5613bb-f448-4dca-9ebd-34ccc22b7acb")
+	groups, err := getUserGroups(token, "user-id-here") // Replace with actual user ID
 	if err != nil {
-		log.Fatalf("Failed to get token: %v", err)
+		log.Fatalf("Failed to get groups: %v", err)
 	}
+
+	fmt.Println("User Groups:", groups)
+
 }
 
 func getAccessToken(tenantID, clientID, clientSecret string) (string, error) {
@@ -73,46 +68,60 @@ func getAccessToken(tenantID, clientID, clientSecret string) (string, error) {
 	return tokenResp.AccessToken, nil
 }
 
-func getUserGroups(accessToken, userID string) error {
+type Group struct {
+	ID   string `json:"id"`
+	Name string `json:"displayName"`
+}
+
+type DirectoryObject struct {
+	ODataType string `json:"@odata.type"`
+	ID        string `json:"id"`
+	Name      string `json:"displayName"`
+}
+
+type DirectoryResponse struct {
+	Value []DirectoryObject `json:"value"`
+}
+
+func getUserGroups(accessToken, userID string) ([]Group, error) {
+	results := []Group{}
+
 	url := fmt.Sprintf("https://graph.microsoft.com/v1.0/users/%s/memberOf", userID)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return err
+		return results, err
 	}
 	req.Header.Add("Authorization", "Bearer "+accessToken)
 
 	client := &http.Client{}
-	resp, err := client.Do(req)
+	r, err := client.Do(req)
 	if err != nil {
-		return err
+		return results, err
 	}
-	defer resp.Body.Close()
+	defer r.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("graph request failed: %s", string(body))
-	}
-
-	var result struct {
-		Value []struct {
-			ID          string `json:"id"`
-			DisplayName string `json:"displayName"`
-			OdataType   string `json:"@odata.type"`
-		} `json:"value"`
-	}
-	err = json.Unmarshal(body, &result)
-	if err != nil {
-		return err
+	body, _ := io.ReadAll(r.Body)
+	if r.StatusCode != 200 {
+		return results, fmt.Errorf("graph request failed: %s", string(body))
 	}
 
-	fmt.Printf("Groups for user %s:\n", userID)
-	for _, item := range result.Value {
-		if item.OdataType == "#microsoft.graph.group" {
-			fmt.Printf("- %s (%s)\n", item.DisplayName, item.ID)
+	var resp DirectoryResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		panic(err)
+	}
+
+	var groups []Group
+	for _, obj := range resp.Value {
+		if obj.ODataType == "#microsoft.graph.group" {
+			groups = append(groups, Group{
+				ID:   obj.ID,
+				Name: obj.Name,
+			})
 		}
 	}
-	return nil
+
+	return groups, nil
 }
 
 func getGroups(accessToken string) error {

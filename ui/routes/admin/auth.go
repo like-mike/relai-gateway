@@ -3,9 +3,12 @@
 package admin
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -159,10 +162,98 @@ func RegisterPublicAuthRoutes(router gin.IRoutes, config AuthConfig) {
 		setSessionCookie(c, "name", name, 3600)
 		setSessionCookie(c, "oid", oid, 3600)
 
+		// Get user groups
+		accessToken, err := getAccessToken(config.AzureTenantID, config.AzureClientID, config.AzureClientSecret)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Failed to get access token")
+			return
+		}
+		results, err := getUserGroups(accessToken, oid)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Failed to get user groups")
+			return
+		}
+		fmt.Println("User groups:", results)
+
 		// TODO: Validate JWT signature with Azure public keys for production
 
 		setSessionCookie(c, "session", "dummy-session", 3600)
 
 		c.Redirect(http.StatusFound, "/admin")
 	})
+}
+
+func getAccessToken(tenantID, clientID, clientSecret string) (string, error) {
+	form := url.Values{}
+	form.Set("grant_type", "client_credentials")
+	form.Set("client_id", clientID)
+	form.Set("client_secret", clientSecret)
+	form.Set("scope", "https://graph.microsoft.com/.default")
+
+	url := fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/token", tenantID)
+	resp, err := http.Post(url, "application/x-www-form-urlencoded", bytes.NewBufferString(form.Encode()))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("token request failed: %s", string(body))
+	}
+
+	var tokenResp struct {
+		AccessToken string `json:"access_token"`
+	}
+	err = json.Unmarshal(body, &tokenResp)
+	if err != nil {
+		return "", err
+	}
+	return tokenResp.AccessToken, nil
+}
+
+func getUserGroups(accessToken, userID string) ([]string, error) {
+	results := []string{}
+
+	url := fmt.Sprintf("https://graph.microsoft.com/v1.0/users/%s/memberOf", userID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return results, err
+	}
+	req.Header.Add("Authorization", "Bearer "+accessToken)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return results, err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		return results, fmt.Errorf("graph request failed: %s", string(body))
+	}
+
+	// var result struct {
+	// 	Value []struct {
+	// 		ID          string `json:"id"`
+	// 		DisplayName string `json:"displayName"`
+	// 		OdataType   string `json:"@odata.type"`
+	// 	} `json:"value"`
+	// }
+	// err = json.Unmarshal(body, &result)
+	// if err != nil {
+	// 	return err
+	// }
+
+	fmt.Println(string(body))
+
+	// fmt.Printf("Groups for user %s:\n", userID)
+	// for _, item := range result.Value {
+	// 	if item.OdataType == "#microsoft.graph.group" {
+	// 		fmt.Printf("- %s (%s)\n", item.DisplayName, item.ID)
+	// 	}
+	// }
+	return results, nil
 }

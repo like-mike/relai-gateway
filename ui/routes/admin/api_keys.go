@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/like-mike/relai-gateway/internal/helpers/middleware"
+	"github.com/like-mike/relai-gateway/shared/middleware"
 )
 
 type APIKeyRow struct {
