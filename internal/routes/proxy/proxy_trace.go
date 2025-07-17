@@ -3,7 +3,7 @@ package proxy
 import (
 	"net/http"
 
-	"github.com/like-mike/relai-gateway/provider"
+	"github.com/like-mike/relai-gateway/internal/provider"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )

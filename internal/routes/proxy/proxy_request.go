@@ -10,7 +10,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/like-mike/relai-gateway/provider"
+	"github.com/like-mike/relai-gateway/internal/provider"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -23,7 +23,10 @@ func prepareRequest(cfg *provider.ProxyConfig, c *gin.Context, target string) (*
 	var baseURL string
 	if dummyBackend == "1" {
 		log.Println("Using dummy backend for testing")
-		baseURL = "http://dummy-backend:2000"
+		baseURL = os.Getenv("DUMMY_BACKEND_HOST")
+		if baseURL == "" {
+			return nil, nil, fmt.Errorf("DUMMY_BACKEND_HOST environment variable is not set")
+		}
 	} else {
 		// config := provider.NewProxyConfigFromEnv("openai")
 		baseURL = cfg.BaseURL

@@ -2,3 +2,5 @@ infra/
 
 .env
 data/
+tmp/
+.idea/

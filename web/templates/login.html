@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+      min-height: 100vh;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-container {
+      background: rgba(255,255,255,0.97);
+      border-radius: 1.5rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 370px;
+      animation: fadeIn 0.7s;
+      box-sizing: border-box;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px);}
+      to { opacity: 1; transform: translateY(0);}
+    }
+    .login-title {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #4f46e5;
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .input-group {
+      margin-bottom: 1.2rem;
+    }
+    .input-label {
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 0.3rem;
+      display: block;
+    }
+    .input-field {
+      width: 100%;
+      padding: 0.7rem 1rem;
+      border-radius: 0.75rem;
+      border: 1px solid #d1d5db;
+      font-size: 1rem;
+      background: #f3f4f6;
+      transition: border-color 0.2s;
+      box-sizing: border-box;
+    }
+    .input-field:focus {
+      border-color: #4f46e5;
+      outline: none;
+      background: #fff;
+    }
+    .login-btn {
+      width: 100%;
+      padding: 0.8rem;
+      border-radius: 0.75rem;
+      background: #4f46e5;
+      color: #fff;
+      font-weight: 600;
+      font-size: 1.1rem;
+      border: none;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: background 0.2s;
+      box-sizing: border-box;
+    }
+    .login-btn:hover {
+      background: #3730a3;
+    }
+    .divider {
+      text-align: center;
+      margin: 2rem 0 1rem 0;
+      color: #6b7280;
+      font-size: 0.95rem;
+      position: relative;
+    }
+    .divider:before, .divider:after {
+      content: "";
+      display: inline-block;
+      width: 40%;
+      height: 1px;
+      background: #d1d5db;
+      vertical-align: middle;
+      margin: 0 0.5rem;
+    }
+    .azure-btn {
+      width: 100%;
+      padding: 0.8rem;
+      border-radius: 0.75rem;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 600;
+      font-size: 1.1rem;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+      transition: background 0.2s;
+      box-sizing: border-box;
+    }
+    .azure-btn:hover {
+      background: #1e40af;
+    }
+    .error-msg {
+      color: #dc2626;
+      background: #fee2e2;
+      border-radius: 0.5rem;
+      padding: 0.7rem 1rem;
+      margin-bottom: 1rem;
+      text-align: center;
+      font-weight: 600;
+      font-size: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-title">Sign in to RelAI Gateway</div>
+    {{if .error}}
+      <div class="error-msg">{{.error}}</div>
+    {{end}}
+    {{if .enableLocalLogin}}
+    <form method="POST" action="/login">
+      <div class="input-group">
+        <label for="username" class="input-label">Username</label>
+        <input type="text" id="username" name="username" required class="input-field">
+      </div>
+      <div class="input-group">
+        <label for="password" class="input-label">Password</label>
+        <input type="password" id="password" name="password" required class="input-field">
+      </div>
+      <button type="submit" class="login-btn">Login</button>
+    </form>
+    {{end}}
+    {{if and .enableLocalLogin .enableAzureAD}}
+      <div class="divider">or</div>
+    {{end}}
+    {{if .enableAzureAD}}
+    <form method="GET" action="/auth/azure">
+      <button type="submit" class="azure-btn">
+        <img src="/static/azure-logo.svg" alt="Azure AD" style="height:1.5rem;width:1.5rem;">
+        Login with Azure AD
+      </button>
+    </form>
+    {{end}}
+  </div>
+</body>
+</html>

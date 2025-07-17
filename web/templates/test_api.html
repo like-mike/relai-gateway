@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-100">
+<head>
+  <meta charset="UTF-8" />
+  <title>RelAI Gateway - Test API</title>
+  <script src="https://unpkg.com/htmx.org@1.9.5"></script>
+  <script src="https://unpkg.com/alpinejs" defer></script>
+  <link href="https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="h-full text-gray-900 bg-gray-100">
+  {{ template "banner.html" . }}
+  <div class="flex h-screen">
+    {{ template "sidebar.html" . }}
+
+    <main class="flex-1 flex flex-col p-10 space-y-6">
+      <div class="w-full max-w-[90rem] mx-auto flex flex-col bg-white shadow rounded-xl min-h-[400px] max-h-[80vh] overflow-auto">
+
+
+        <!-- Controls -->
+        <div class="p-4 border-b flex gap-4 items-end">
+          <div class="flex-1">
+            <label class="text-sm font-semibold block mb-1">API Key</label>
+            <select id="api-key" class="w-full px-3 py-2 border rounded">
+              {{ range .APIKeys }}
+              <option value="{{ .Key }}">{{ .Key }} ({{ .OrgName }})</option>
+              {{ end }}
+            </select>
+          </div>
+          <div class="flex-1">
+            <label class="text-sm font-semibold block mb-1">Model</label>
+            <select id="model" class="w-full px-3 py-2 border rounded">
+              <option value="gpt-4">gpt-4</option>
+              <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+              <option value="mistral">mistral</option>
+              <option value="claude">claude</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-sm font-semibold block mb-1 invisible">Streaming</label>
+            <label class="flex items-center space-x-2">
+              <input type="checkbox" id="stream-toggle" class="form-checkbox h-4 w-4 text-blue-600" />
+              <span class="text-sm text-gray-700">Stream</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Chat Window -->
+        <div id="chat-window" class="flex-1 p-4 space-y-4 overflow-y-auto">
+          <!-- Chat messages will be appended here -->
+        </div>
+
+        <!-- Input -->
+        <form id="chat-form" class="p-4 border-t bg-gray-50" onsubmit="handleSubmit(event)">
+          <div class="flex gap-2">
+            <input id="user-input" type="text" placeholder="Ask something..." required
+              class="flex-1 px-4 py-2 border rounded-lg shadow-sm focus:outline-none focus:ring" />
+            <button type="submit"
+              class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-500 transition">Send</button>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const chatWindow = document.getElementById('chat-window');
+    const form = document.getElementById('chat-form');
+    const input = document.getElementById('user-input');
+
+    function appendMessage(content, isUser = false) {
+      const bubble = document.createElement('div');
+      bubble.className = `max-w-lg px-4 py-2 rounded-xl shadow whitespace-pre-wrap ${
+        isUser ? 'bg-blue-100 self-end text-right' : 'bg-gray-100 self-start text-left'
+      }`;
+      bubble.textContent = content;
+      chatWindow.appendChild(bubble);
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+      return bubble;
+    }
+
+    async function handleSubmit(e) {
+      e.preventDefault();
+
+      const prompt = input.value;
+      const apiKey = document.getElementById('api-key').value;
+      // const model = document.getElementById('model').value || 'gpt-4.1';
+      const model ='gpt-4.1';
+      const stream = document.getElementById('stream-toggle').checked;
+
+      appendMessage(prompt, true);
+      input.value = '';
+
+      const placeholder = appendMessage("Thinking...", false);
+
+      const response = await fetch("/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer changeme`
+        },
+        body: JSON.stringify({
+          model,
+          stream,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+
+      if (!stream) {
+        const data = await response.json();
+        const reply = data.choices?.[0]?.message?.content || "(no reply)";
+        placeholder.remove();
+        appendMessage(reply, false);
+      } else {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = '';
+
+        placeholder.textContent = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split('\n').filter(line => line.trim() !== '');
+          buffer = lines.pop() || ''; // Keep the partial line
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const payload = line.replace('data: ', '').trim();
+              if (payload === '[DONE]') return;
+              try {
+                const json = JSON.parse(payload);
+                const delta = json.choices?.[0]?.delta?.content || '';
+                placeholder.textContent += delta;
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+              } catch (err) {
+                console.error('Streaming JSON parse error:', err);
+              }
+            }
+          }
+        }
+      }
+    }
+  </script>
+</body>
+</html>

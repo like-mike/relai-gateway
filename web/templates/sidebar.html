@@ -1,0 +1,23 @@
+<nav class="w-64 bg-gray-800 text-white flex flex-col py-8 px-4 h-full">
+  <div class="mb-6">
+    <div class="text-sm font-semibold text-gray-400 px-2">ADMIN MENU</div>
+  </div>
+  <ul class="space-y-2">
+    <li>
+      <a href="/admin" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "api_keys"}} bg-gray-700{{end}}">
+        API Keys
+      </a>
+    </li>
+    <!-- <li><a href="#" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Usage & Quota</a></li> -->
+    <li>
+      <a href="/admin/test-api" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "test_api"}} bg-gray-700{{end}}">
+        Test API
+      </a>
+    </li>
+    <li>
+      <a href="#" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "settings"}} bg-gray-700{{end}}">
+        Settings
+      </a>
+    </li>
+  </ul>
+</nav>
