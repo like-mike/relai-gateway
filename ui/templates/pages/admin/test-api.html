@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-100">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Test API - RelAI Gateway</title>
+  <script src="https://unpkg.com/htmx.org@1.9.5"></script>
+  <link href="https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="h-full text-gray-900">
+  <!-- Banner/Header -->
+  {{template "banner.html" .}}
+
+  <!-- Main layout -->
+  <div class="flex h-screen">
+    <!-- Sidebar -->
+    {{template "sidebar.html" .}}
+
+    <!-- Main Content -->
+    <main class="flex-1 p-10 overflow-auto">
+      <h1 class="text-2xl font-bold text-gray-900 mb-6">Test API</h1>
+      
+      <!-- Test API content will go here -->
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <p class="text-gray-600">API testing interface coming soon...</p>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

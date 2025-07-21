@@ -1,0 +1,263 @@
+<!-- Delete Model Modal -->
+<div id="delete-model-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden transition-opacity duration-300 ease-out" role="dialog" aria-modal="true" aria-labelledby="delete-model-title" aria-describedby="delete-model-description">
+  <!-- Modal Container -->
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 transform transition-all duration-300 ease-out scale-95 opacity-0" id="delete-model-container">
+    <!-- Modal Header -->
+    <div class="flex items-center justify-between p-6 border-b border-gray-200">
+      <div class="flex items-center space-x-3">
+        <div class="flex-shrink-0">
+          <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+        </div>
+        <h2 id="delete-model-title" class="text-lg font-semibold text-gray-900">Delete Model</h2>
+      </div>
+      <button type="button" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded-lg p-1" onclick="closeDeleteModelModal()" aria-label="Close modal">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="p-6" id="delete-model-description">
+      <p class="text-gray-700 mb-4">Are you sure you want to delete this model?</p>
+      <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+        <div class="flex items-start">
+          <svg class="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+          <div>
+            <p class="text-sm text-red-800 font-medium mb-1">This action cannot be undone</p>
+            <ul class="text-sm text-red-700 space-y-1">
+              <li>• All organization access permissions will be removed</li>
+              <li>• Applications using this model will lose access</li>
+              <li>• Model configuration and settings will be permanently deleted</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Model Info -->
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+            </svg>
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium text-gray-900" id="delete-model-name">Model Name</p>
+            <p class="text-xs text-gray-500" id="delete-model-type">Model Type</p>
+            <div class="mt-2">
+              <div class="text-xs text-gray-600">Organizations with access:</div>
+              <div id="delete-model-orgs" class="flex flex-wrap gap-1 mt-1">
+                <!-- Organization badges will be populated here -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Confirmation Input -->
+      <div class="mt-4">
+        <label for="delete-confirmation" class="block text-sm font-medium text-gray-700 mb-2">
+          Type <span class="font-mono bg-gray-100 px-1 rounded">DELETE</span> to confirm:
+        </label>
+        <input type="text" id="delete-confirmation" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors duration-200" placeholder="Type DELETE here">
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="flex items-center justify-end space-x-3 p-6 border-t border-gray-200">
+      <button type="button" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2" onclick="closeDeleteModelModal()">Cancel</button>
+      <button type="button" id="confirm-delete-model-btn" class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2" onclick="confirmDeleteModel()" disabled>Delete Model</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Delete model modal functionality
+let deleteModelLastFocusedElement = null;
+let deleteModelFocusableElements = [];
+let currentDeletingModel = null;
+
+function openDeleteModelModal(model) {
+  // Store the model and currently focused element
+  currentDeletingModel = model;
+  deleteModelLastFocusedElement = document.activeElement;
+  
+  const modal = document.getElementById('delete-model-modal');
+  const modalContainer = document.getElementById('delete-model-container');
+  
+  // Populate modal with model data
+  populateDeleteModelInfo(model);
+  
+  // Reset confirmation input
+  document.getElementById('delete-confirmation').value = '';
+  document.getElementById('confirm-delete-model-btn').disabled = true;
+  
+  // Show modal
+  modal.classList.remove('hidden');
+  
+  // Trigger animations
+  setTimeout(() => {
+    modal.classList.add('opacity-100');
+    modalContainer.classList.remove('scale-95', 'opacity-0');
+    modalContainer.classList.add('scale-100', 'opacity-100');
+  }, 10);
+  
+  // Set up focus trapping
+  setupDeleteModelFocusTrap();
+  
+  // Focus the confirmation input
+  setTimeout(() => {
+    document.getElementById('delete-confirmation').focus();
+  }, 100);
+  
+  // Add event listeners
+  document.addEventListener('keydown', handleDeleteModelKeyDown);
+  modal.addEventListener('click', handleDeleteModelOverlayClick);
+}
+
+function populateDeleteModelInfo(model) {
+  document.getElementById('delete-model-name').textContent = model.name || 'Unnamed Model';
+  document.getElementById('delete-model-type').textContent = model.type || 'Unknown Type';
+  
+  // Populate organizations
+  const orgsContainer = document.getElementById('delete-model-orgs');
+  if (model.organizations && model.organizations.length > 0) {
+    orgsContainer.innerHTML = model.organizations.slice(0, 5).map(org => 
+      `<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">${org.name}</span>`
+    ).join('');
+    
+    if (model.organizations.length > 5) {
+      orgsContainer.innerHTML += `<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full">+${model.organizations.length - 5}</span>`;
+    }
+  } else {
+    orgsContainer.innerHTML = '<span class="text-xs text-gray-500">No organizations assigned</span>';
+  }
+}
+
+function closeDeleteModelModal() {
+  const modal = document.getElementById('delete-model-modal');
+  const modalContainer = document.getElementById('delete-model-container');
+  
+  // Trigger close animations
+  modal.classList.remove('opacity-100');
+  modalContainer.classList.remove('scale-100', 'opacity-100');
+  modalContainer.classList.add('scale-95', 'opacity-0');
+  
+  // Hide modal after animation
+  setTimeout(() => {
+    modal.classList.add('hidden');
+    
+    // Reset state
+    currentDeletingModel = null;
+    document.getElementById('delete-confirmation').value = '';
+    document.getElementById('confirm-delete-model-btn').disabled = true;
+    
+    // Restore focus
+    if (deleteModelLastFocusedElement) {
+      deleteModelLastFocusedElement.focus();
+    }
+  }, 300);
+  
+  // Remove event listeners
+  document.removeEventListener('keydown', handleDeleteModelKeyDown);
+  modal.removeEventListener('click', handleDeleteModelOverlayClick);
+}
+
+function setupDeleteModelFocusTrap() {
+  const modal = document.getElementById('delete-model-container');
+  deleteModelFocusableElements = modal.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  );
+}
+
+function handleDeleteModelKeyDown(event) {
+  if (event.key === 'Escape') {
+    closeDeleteModelModal();
+    return;
+  }
+  
+  if (event.key === 'Tab') {
+    trapDeleteModelFocus(event);
+  }
+}
+
+function trapDeleteModelFocus(event) {
+  const firstFocusable = deleteModelFocusableElements[0];
+  const lastFocusable = deleteModelFocusableElements[deleteModelFocusableElements.length - 1];
+  
+  if (event.shiftKey) {
+    // Shift + Tab
+    if (document.activeElement === firstFocusable) {
+      event.preventDefault();
+      lastFocusable.focus();
+    }
+  } else {
+    // Tab
+    if (document.activeElement === lastFocusable) {
+      event.preventDefault();
+      firstFocusable.focus();
+    }
+  }
+}
+
+function handleDeleteModelOverlayClick(event) {
+  if (event.target === event.currentTarget) {
+    closeDeleteModelModal();
+  }
+}
+
+async function confirmDeleteModel() {
+  if (!currentDeletingModel) return;
+  
+  // Show loading state
+  const confirmBtn = document.getElementById('confirm-delete-model-btn');
+  const originalText = confirmBtn.textContent;
+  confirmBtn.textContent = 'Deleting...';
+  confirmBtn.disabled = true;
+  
+  try {
+    const response = await fetch(`/api/models/${currentDeletingModel.id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to delete model');
+    }
+    
+    // Success - close modal and reload models
+    closeDeleteModelModal();
+    loadModels();
+    
+  } catch (error) {
+    console.error('Failed to delete model:', error);
+    alert(`Failed to delete model: ${error.message}`);
+    
+    // Restore button state
+    confirmBtn.textContent = originalText;
+    confirmBtn.disabled = false;
+  }
+}
+
+// Handle confirmation input
+document.getElementById('delete-confirmation').addEventListener('input', function(e) {
+  const confirmBtn = document.getElementById('confirm-delete-model-btn');
+  confirmBtn.disabled = e.target.value !== 'DELETE';
+});
+
+// Allow Enter key to trigger deletion when confirmation is valid
+document.getElementById('delete-confirmation').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && e.target.value === 'DELETE') {
+    confirmDeleteModel();
+  }
+});
+</script>

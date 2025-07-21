@@ -48,9 +48,6 @@ func main() {
 
 	// Attach DB to Gin context
 	r.Use(middleware.DBMiddleware(conn))
-
-	// Admin API routes (moved to authorized group)
-
 	// Static health check
 	r.GET("/health", health.Handler)
 
@@ -62,11 +59,7 @@ func main() {
 	r.GET("/v1/models", models.Handler)
 	r.GET("/models", models.Handler)
 
-	// // Register public authentication routes from admin package
-	// admin.RegisterPublicAuthRoutes(r, config)
 	// Protected routes
-	authorized := r.Group("/")
-	authorized.Use(middleware.AuthMiddlewareGin())
 
 	// Catch-all for proxying
 	r.NoRoute(proxy.Handler)

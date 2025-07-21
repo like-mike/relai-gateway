@@ -1,0 +1,398 @@
+<!-- Organization Selector Component -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6" id="org-selector-container">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-4">
+    <h3 class="text-sm font-medium text-gray-700">Organization</h3>
+    <button type="button" id="refresh-orgs-btn" onclick="refreshOrganizations()" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded p-1" title="Refresh organizations">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Selected Organization Display -->
+  <div class="relative">
+    <button type="button" id="org-selector-btn" onclick="toggleOrgSelector()" class="w-full flex items-center justify-between px-3 py-2 text-left bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="org-selector-label">
+      <div class="flex items-center space-x-3 min-w-0 flex-1">
+        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+          <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+          </svg>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="text-sm font-medium text-gray-900 truncate" id="selected-org-name">Loading...</div>
+          <div class="text-xs text-gray-500 truncate" id="selected-org-id">Fetching organizations...</div>
+        </div>
+      </div>
+      <div class="ml-2 flex-shrink-0">
+        <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" id="org-selector-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+      </div>
+    </button>
+
+    <!-- Loading State -->
+    <div id="org-loading" class="hidden absolute inset-0 bg-gray-50 rounded-lg flex items-center justify-center">
+      <div class="flex items-center space-x-2">
+        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+        <span class="text-sm text-gray-600">Loading...</span>
+      </div>
+    </div>
+
+    <!-- Dropdown Menu -->
+    <div id="org-dropdown" class="hidden absolute z-50 mt-1 w-full bg-white shadow-lg max-h-96 rounded-lg py-1 text-base ring-1 ring-black ring-opacity-5 focus:outline-none" role="listbox" aria-labelledby="org-selector-label">
+      <!-- Search Input -->
+      <div class="p-2 border-b border-gray-200">
+        <div class="relative">
+          <input type="text" id="org-search-input" placeholder="Search organizations..." class="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" autocomplete="off">
+          <div class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Organization List -->
+      <div id="org-list" class="max-h-80 overflow-auto">
+        <!-- Organizations will be populated here -->
+        <div class="p-4 text-center text-gray-500">
+          <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+          <div class="text-sm">Loading organizations...</div>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div id="org-error" class="hidden p-4 text-center">
+        <div class="text-red-600 mb-2">
+          <svg class="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <div class="text-sm text-gray-700 mb-3">Failed to load organizations</div>
+        <button type="button" onclick="refreshOrganizations()" class="text-sm text-blue-600 hover:text-blue-800 font-medium">Try again</button>
+      </div>
+
+      <!-- No Results -->
+      <div id="org-no-results" class="hidden p-4 text-center text-gray-500">
+        <div class="text-sm">No organizations found</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Organization selector state
+let organizations = [];
+let currentOrgId = null;
+let isOrgDropdownOpen = false;
+let filteredOrganizations = [];
+let selectedIndex = -1;
+
+// Expose currentOrgId globally for other components
+window.currentOrgId = null;
+
+// Initialize organization selector on page load
+document.addEventListener('DOMContentLoaded', function() {
+  initializeOrgSelector();
+});
+
+async function initializeOrgSelector() {
+  // Load saved organization from localStorage
+  const savedOrgId = localStorage.getItem('selectedOrgId');
+  
+  // Fetch organizations
+  await fetchOrganizations();
+  
+  // Set initial organization
+  if (savedOrgId && organizations.find(org => org.id === savedOrgId)) {
+    selectOrganization(savedOrgId);
+  } else if (organizations.length > 0) {
+    selectOrganization(organizations[0].id);
+  } else {
+    // If no organizations available, trigger API keys load without filter
+    refreshApiKeys();
+  }
+}
+
+async function fetchOrganizations() {
+  try {
+    showOrgLoading(true);
+    
+    const response = await fetch('/api/organizations', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    organizations = data.organizations || [];
+    
+    renderOrganizations();
+    hideOrgError();
+    
+  } catch (error) {
+    console.error('Failed to fetch organizations:', error);
+    showOrgError();
+  } finally {
+    showOrgLoading(false);
+  }
+}
+
+function renderOrganizations() {
+  const orgList = document.getElementById('org-list');
+  
+  if (organizations.length === 0) {
+    orgList.innerHTML = '<div class="p-4 text-center text-gray-500"><div class="text-sm">No organizations available</div></div>';
+    return;
+  }
+  
+  filteredOrganizations = [...organizations];
+  renderFilteredOrganizations();
+}
+
+function renderFilteredOrganizations() {
+  const orgList = document.getElementById('org-list');
+  
+  if (filteredOrganizations.length === 0) {
+    document.getElementById('org-no-results').classList.remove('hidden');
+    orgList.innerHTML = '';
+    return;
+  }
+  
+  document.getElementById('org-no-results').classList.add('hidden');
+  
+  const html = filteredOrganizations.map((org, index) => `
+    <div class="org-option relative cursor-pointer select-none py-2 pl-3 pr-9 hover:bg-gray-100 ${currentOrgId === org.id ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}" 
+         data-org-id="${org.id}" 
+         data-index="${index}"
+         role="option" 
+         aria-selected="${currentOrgId === org.id ? 'true' : 'false'}"
+         onclick="selectOrganization('${org.id}')">
+      <div class="flex items-center space-x-3">
+        <div class="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+          <svg class="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+          </svg>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="font-medium truncate">${org.name}</div>
+          <div class="text-xs text-gray-500 truncate">ID: ${org.id}</div>
+        </div>
+      </div>
+      ${currentOrgId === org.id ? `
+        <span class="absolute inset-y-0 right-0 flex items-center pr-4">
+          <svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+          </svg>
+        </span>
+      ` : ''}
+    </div>
+  `).join('');
+  
+  orgList.innerHTML = html;
+}
+
+function selectOrganization(orgId) {
+  const org = organizations.find(o => o.id === orgId);
+  if (!org) return;
+  
+  console.log('🔍 Selecting organization:', orgId, org.name);
+  
+  currentOrgId = orgId;
+  window.currentOrgId = orgId; // Expose globally
+  
+  // Update UI
+  document.getElementById('selected-org-name').textContent = org.name;
+  document.getElementById('selected-org-id').textContent = `ID: ${org.id}`;
+  
+  // Save to localStorage
+  localStorage.setItem('selectedOrgId', orgId);
+  
+  // Close dropdown
+  closeOrgDropdown();
+  
+  // Refresh API keys for selected organization
+  console.log('🔍 About to refresh API keys for org:', orgId);
+  refreshApiKeys();
+  
+  // Update filtered organizations to reflect selection
+  renderFilteredOrganizations();
+}
+
+function toggleOrgSelector() {
+  if (isOrgDropdownOpen) {
+    closeOrgDropdown();
+  } else {
+    openOrgDropdown();
+  }
+}
+
+function openOrgDropdown() {
+  const dropdown = document.getElementById('org-dropdown');
+  const chevron = document.getElementById('org-selector-chevron');
+  const button = document.getElementById('org-selector-btn');
+  
+  dropdown.classList.remove('hidden');
+  chevron.style.transform = 'rotate(180deg)';
+  button.setAttribute('aria-expanded', 'true');
+  isOrgDropdownOpen = true;
+  
+  // Focus search input
+  setTimeout(() => {
+    document.getElementById('org-search-input').focus();
+  }, 100);
+  
+  // Add click outside listener
+  setTimeout(() => {
+    document.addEventListener('click', handleClickOutside);
+  }, 10);
+  
+  // Reset search
+  document.getElementById('org-search-input').value = '';
+  filterOrganizations('');
+}
+
+function closeOrgDropdown() {
+  const dropdown = document.getElementById('org-dropdown');
+  const chevron = document.getElementById('org-selector-chevron');
+  const button = document.getElementById('org-selector-btn');
+  
+  dropdown.classList.add('hidden');
+  chevron.style.transform = 'rotate(0deg)';
+  button.setAttribute('aria-expanded', 'false');
+  isOrgDropdownOpen = false;
+  selectedIndex = -1;
+  
+  // Remove click outside listener
+  document.removeEventListener('click', handleClickOutside);
+}
+
+function handleClickOutside(event) {
+  const container = document.getElementById('org-selector-container');
+  if (!container.contains(event.target)) {
+    closeOrgDropdown();
+  }
+}
+
+function filterOrganizations(query) {
+  const lowerQuery = query.toLowerCase();
+  filteredOrganizations = organizations.filter(org => 
+    org.name.toLowerCase().includes(lowerQuery) || 
+    org.id.toLowerCase().includes(lowerQuery)
+  );
+  
+  selectedIndex = -1;
+  renderFilteredOrganizations();
+}
+
+function refreshOrganizations() {
+  fetchOrganizations();
+}
+
+function refreshApiKeys() {
+  // Trigger HTMX refresh of API keys table with organization filter
+  const apiKeysTable = document.getElementById('api-keys-table');
+  
+  if (!apiKeysTable) {
+    return;
+  }
+  
+  // Build URL with organization filter
+  let url = '/api-keys';
+  if (currentOrgId) {
+    url += `?org_id=${currentOrgId}`;
+  }
+  
+  // Use htmx.ajax for direct request
+  htmx.ajax('GET', url, {
+    target: '#api-keys-table',
+    swap: 'outerHTML'
+  });
+}
+
+function showOrgLoading(show) {
+  const loading = document.getElementById('org-loading');
+  if (show) {
+    loading.classList.remove('hidden');
+  } else {
+    loading.classList.add('hidden');
+  }
+}
+
+function showOrgError() {
+  const orgList = document.getElementById('org-list');
+  const orgError = document.getElementById('org-error');
+  
+  orgList.innerHTML = '';
+  orgError.classList.remove('hidden');
+}
+
+function hideOrgError() {
+  const orgError = document.getElementById('org-error');
+  orgError.classList.add('hidden');
+}
+
+// Search input event listener
+document.addEventListener('DOMContentLoaded', function() {
+  const searchInput = document.getElementById('org-search-input');
+  
+  searchInput.addEventListener('input', function(e) {
+    filterOrganizations(e.target.value);
+  });
+  
+  // Keyboard navigation
+  searchInput.addEventListener('keydown', function(e) {
+    handleOrgKeyNavigation(e);
+  });
+});
+
+function handleOrgKeyNavigation(e) {
+  if (!isOrgDropdownOpen) return;
+  
+  switch(e.key) {
+    case 'ArrowDown':
+      e.preventDefault();
+      selectedIndex = Math.min(selectedIndex + 1, filteredOrganizations.length - 1);
+      updateSelection();
+      break;
+      
+    case 'ArrowUp':
+      e.preventDefault();
+      selectedIndex = Math.max(selectedIndex - 1, -1);
+      updateSelection();
+      break;
+      
+    case 'Enter':
+      e.preventDefault();
+      if (selectedIndex >= 0 && filteredOrganizations[selectedIndex]) {
+        selectOrganization(filteredOrganizations[selectedIndex].id);
+      }
+      break;
+      
+    case 'Escape':
+      e.preventDefault();
+      closeOrgDropdown();
+      break;
+  }
+}
+
+function updateSelection() {
+  const options = document.querySelectorAll('.org-option');
+  
+  options.forEach((option, index) => {
+    if (index === selectedIndex) {
+      option.classList.add('bg-gray-100');
+      option.scrollIntoView({ block: 'nearest' });
+    } else if (!option.classList.contains('bg-blue-50')) {
+      option.classList.remove('bg-gray-100');
+    }
+  });
+}
+</script>

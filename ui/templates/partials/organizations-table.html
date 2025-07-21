@@ -1,0 +1,97 @@
+<tbody id="organizations-table" class="bg-white divide-y divide-gray-200">
+  {{if gt (len .organizations) 0}}
+    {{range .organizations}}
+    <tr>
+      <td class="px-6 py-4 whitespace-nowrap">
+        <div class="text-sm font-medium text-gray-900">{{.Name}}</div>
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap">
+        <div class="text-sm text-gray-500">{{.Description}}</div>
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap">
+        <div class="text-sm text-gray-900">{{.UserCount}} users</div>
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap">
+        <div class="text-sm text-gray-900">
+          {{if .Quota}}
+            {{.Quota.UsedTokens}}/{{.Quota.TotalQuota}} tokens
+          {{else}}
+            No quota set
+          {{end}}
+        </div>
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap">
+        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full {{if .IsActive}}bg-green-100 text-green-800{{else}}bg-red-100 text-red-800{{end}}">
+          {{if .IsActive}}Active{{else}}Inactive{{end}}
+        </span>
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+        <div class="flex items-center space-x-2">
+          <button onclick="editOrganization('{{.ID}}')" class="text-blue-600 hover:text-blue-900">Edit</button>
+          <button onclick="manageQuota('{{.ID}}')" class="text-green-600 hover:text-green-900">Quota</button>
+          {{if not .IsActive}}
+          <button onclick="deleteOrganization('{{.ID}}')" class="text-red-600 hover:text-red-900">Delete</button>
+          {{end}}
+        </div>
+      </td>
+    </tr>
+    {{end}}
+  {{else}}
+    <tr>
+      <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+        <div class="flex flex-col items-center">
+          <svg class="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+          </svg>
+          <p class="text-lg font-medium text-gray-900 mb-1">No organizations found</p>
+          <p class="text-gray-500">Create your first organization to get started</p>
+        </div>
+      </td>
+    </tr>
+  {{end}}
+</tbody>
+
+<script>
+function editOrganization(orgId) {
+  // Load organization data and open edit modal
+  fetch(`/admin/settings/organizations/${orgId}`)
+    .then(response => response.json())
+    .then(data => {
+      // Populate edit modal with organization data
+      document.getElementById('edit-org-id').value = data.id;
+      document.getElementById('edit-org-name').value = data.name;
+      document.getElementById('edit-org-description').value = data.description;
+      document.getElementById('edit-org-active').checked = data.is_active;
+      
+      // Open edit modal
+      document.getElementById('edit-org-modal').classList.remove('hidden');
+    })
+    .catch(error => {
+      console.error('Error loading organization:', error);
+      alert('Failed to load organization data');
+    });
+}
+
+function manageQuota(orgId) {
+  // Open quota management modal/page
+  alert(`Quota management for organization ${orgId} - coming soon!`);
+}
+
+function deleteOrganization(orgId) {
+  if (confirm('Are you sure you want to delete this organization? This action cannot be undone.')) {
+    fetch(`/admin/settings/organizations/${orgId}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    })
+    .then(response => response.text())
+    .then(html => {
+      // Replace the table content
+      document.getElementById('organizations-table').outerHTML = html;
+    })
+    .catch(error => {
+      console.error('Error deleting organization:', error);
+      alert('Failed to delete organization');
+    });
+  }
+}
+</script>

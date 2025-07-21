@@ -1,0 +1,388 @@
+<tbody id="api-keys-table" class="bg-white divide-y divide-gray-200">
+  {{if gt (len .apiKeys) 0}}
+    {{range .apiKeys}}
+    <tr>
+      <td class="px-3 py-4 whitespace-nowrap">
+        <div class="flex items-center">
+          <div class="text-sm font-medium text-gray-900">{{.Name}}</div>
+        </div>
+      </td>
+      <td class="px-3 py-4 whitespace-nowrap">
+        <div class="text-sm text-gray-900">
+          {{if .Organization}}{{.Organization.Name}}{{else}}Unknown{{end}}
+        </div>
+      </td>
+      <td class="px-3 py-4 whitespace-nowrap">
+        <div class="text-sm text-gray-900">
+          {{if .UserID}}{{.UserID}}{{else}}System{{end}}
+        </div>
+      </td>
+      <td class="px-3 py-4 whitespace-nowrap">
+        <div class="text-sm text-gray-500">{{.CreatedAt.Format "Jan 2, 2006"}}</div>
+      </td>
+      <td class="px-3 py-4 whitespace-nowrap">
+        <div class="text-sm text-gray-900">{{.MaxTokens}}</div>
+      </td>
+      <td class="px-3 py-4 whitespace-nowrap">
+        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full {{if .IsActive}}bg-green-100 text-green-800{{else}}bg-red-100 text-red-800{{end}}">
+          {{if .IsActive}}Active{{else}}Inactive{{end}}
+        </span>
+      </td>
+      <td class="px-3 py-4 whitespace-nowrap text-right text-sm font-medium">
+        <div class="flex items-center space-x-2">
+          <button onclick="viewKey('{{.ID}}')" class="text-blue-600 hover:text-blue-900">View</button>
+          <button onclick="deleteKey('{{.ID}}')" class="text-red-600 hover:text-red-900">Delete</button>
+        </div>
+      </td>
+    </tr>
+    {{end}}
+  {{else}}
+    <tr>
+      <td colspan="7" class="px-3 py-8 text-center text-gray-500">
+        <div class="flex flex-col items-center">
+          <svg class="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+          </svg>
+          <p class="text-lg font-medium text-gray-900 mb-1">No API keys found</p>
+          <p class="text-gray-500">Create your first API key to get started</p>
+        </div>
+      </td>
+    </tr>
+  {{end}}
+</tbody>
+
+<script>
+function viewKey(keyId) {
+  // Open view key modal - placeholder for now
+  alert('View key: ' + keyId);
+}
+
+function deleteKey(keyId) {
+  if (confirm('Are you sure you want to delete this API key?')) {
+    // Get current organization ID from localStorage or global variable
+    const selectedOrgId = localStorage.getItem('selectedOrgId') || window.currentOrgId;
+    
+    // Build URL with organization filter if available
+    let url = '/api/keys/' + keyId;
+    if (selectedOrgId) {
+      url += '?org_id=' + selectedOrgId;
+    }
+    
+    // Send DELETE request via HTMX
+    fetch(url, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include'
+    })
+    .then(response => response.text())
+    .then(html => {
+      // Replace the table content
+      document.getElementById('api-keys-table').outerHTML = html;
+    })
+    .catch(error => {
+      console.error('Error deleting API key:', error);
+      alert('Failed to delete API key');
+    });
+  }
+}
+
+function openNewKeyModal() {
+  // Create the modal if it doesn't exist
+  if (!document.getElementById('new-key-modal')) {
+    createNewKeyModal();
+  }
+  
+  // Get modal elements
+  const modal = document.getElementById('new-key-modal');
+  const modalContainer = document.getElementById('new-key-modal-container');
+  const form = document.getElementById('new-key-form');
+  
+  if (!modal || !modalContainer || !form) {
+    console.error('Modal elements not found after creation');
+    return;
+  }
+  
+  openModalNow(modal, modalContainer, form);
+}
+
+function openModalNow(modal, modalContainer, form) {
+  
+  // Update form action with organization filter if available
+  const selectedOrgId = localStorage.getItem('selectedOrgId') || window.currentOrgId;
+  if (selectedOrgId) {
+    form.setAttribute('hx-post', `/api/keys?org_id=${selectedOrgId}`);
+    // Set the organization ID in the hidden field
+    const orgIdField = document.getElementById('organization-id');
+    if (orgIdField) {
+      orgIdField.value = selectedOrgId;
+    }
+  } else {
+    form.setAttribute('hx-post', '/api/keys');
+  }
+  
+  // Set the user ID in the hidden field (hardcoded for now)
+  const userIdField = document.getElementById('user-id');
+  if (userIdField) {
+    userIdField.value = 'Admin'; // Simple string ID
+  }
+  
+  // Show modal
+  modal.classList.remove('hidden');
+  
+  // Trigger animations
+  setTimeout(() => {
+    modal.classList.add('opacity-100');
+    modalContainer.classList.remove('scale-95', 'opacity-0');
+    modalContainer.classList.add('scale-100', 'opacity-100');
+  }, 10);
+  
+  // Focus the first input
+  setTimeout(() => {
+    const firstInput = document.getElementById('key-name');
+    if (firstInput) firstInput.focus();
+  }, 100);
+}
+
+function closeNewKeyModal() {
+  const modal = document.getElementById('new-key-modal');
+  const modalContainer = document.getElementById('new-key-modal-container');
+  
+  if (!modal || !modalContainer) return;
+  
+  // Trigger close animations
+  modal.classList.remove('opacity-100');
+  modalContainer.classList.remove('scale-100', 'opacity-100');
+  modalContainer.classList.add('scale-95', 'opacity-0');
+  
+  // Hide modal after animation
+  setTimeout(() => {
+    modal.classList.add('hidden');
+    
+    // Reset form
+    const form = document.getElementById('new-key-form');
+    if (form) form.reset();
+  }, 300);
+}
+
+function handleCreateKeyResponse(event) {
+  const xhr = event.detail.xhr;
+  
+  if (xhr.status === 200) {
+    try {
+      const response = JSON.parse(xhr.responseText);
+      if (response.success) {
+        // Close the create modal first
+        closeNewKeyModal();
+        
+        // Show success modal with the new key
+        showSuccessModal(response.newKey, response.keyName, response.message);
+        
+        // Refresh the API keys table
+        refreshAPIKeysTable();
+      } else {
+        alert('Error: ' + (response.error || 'Unknown error'));
+      }
+    } catch (e) {
+      console.error('Failed to parse response:', e);
+      alert('Error creating API key');
+    }
+  } else {
+    alert('Error creating API key: ' + xhr.status);
+  }
+}
+
+function showSuccessModal(newKey, keyName, message) {
+  const successModalHTML = `
+    <div id="success-key-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ease-out">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 transform transition-all duration-300 ease-out">
+        <div class="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 class="text-xl font-bold text-green-900">API Key Created Successfully!</h2>
+          <button type="button" class="text-gray-400 hover:text-gray-600" onclick="closeSuccessModal()">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="p-6">
+          <div class="flex items-center mb-4">
+            <svg class="w-12 h-12 text-green-500 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">${keyName}</h3>
+              <p class="text-sm text-gray-600">${message}</p>
+            </div>
+          </div>
+          
+          <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <div class="flex">
+              <svg class="w-5 h-5 text-red-400 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.734 0L3.732 16c-.77.833.192 2.5 1.732 2.5z"></path>
+              </svg>
+              <div>
+                <h4 class="text-sm font-medium text-red-800">Important Security Notice</h4>
+                <p class="text-sm text-red-700 mt-1">This is the only time you'll be able to view this API key. Copy it now and store it securely.</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Your API Key:</label>
+            <div class="flex">
+              <input type="text" id="generated-key" value="${newKey}" readonly class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg bg-gray-50 font-mono text-sm">
+              <button onclick="copyToClipboard()" class="px-4 py-2 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                Copy
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center justify-end space-x-3 p-6 border-t border-gray-200">
+          <button type="button" class="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg" onclick="closeSuccessModal()">I've Copied the Key</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', successModalHTML);
+}
+
+function closeSuccessModal() {
+  const modal = document.getElementById('success-key-modal');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+function copyToClipboard() {
+  const keyInput = document.getElementById('generated-key');
+  keyInput.select();
+  keyInput.setSelectionRange(0, 99999); // For mobile devices
+  document.execCommand('copy');
+  
+  // Show feedback
+  const button = event.target;
+  const originalText = button.textContent;
+  button.textContent = 'Copied!';
+  button.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+  button.classList.add('bg-green-600');
+  
+  setTimeout(() => {
+    button.textContent = originalText;
+    button.classList.remove('bg-green-600');
+    button.classList.add('bg-blue-600', 'hover:bg-blue-700');
+  }, 2000);
+}
+
+function refreshAPIKeysTable() {
+  // Trigger a refresh of the API keys table
+  const selectedOrgId = localStorage.getItem('selectedOrgId') || window.currentOrgId;
+  let url = '/api-keys';
+  if (selectedOrgId) {
+    url += '?org_id=' + selectedOrgId;
+  }
+  
+  fetch(url)
+    .then(response => response.text())
+    .then(html => {
+      document.getElementById('api-keys-table').outerHTML = html;
+    })
+    .catch(error => {
+      console.error('Error refreshing table:', error);
+    });
+}
+
+// Trigger refresh on page load
+document.addEventListener('DOMContentLoaded', function() {
+  // The table is loaded via HTMX on page load
+  
+  // Create modal HTML if it doesn't exist
+  if (!document.getElementById('new-key-modal')) {
+    createNewKeyModal();
+  }
+});
+
+function createNewKeyModal() {
+  const modalHTML = `
+    <div id="new-key-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden transition-opacity duration-300 ease-out" role="dialog" aria-modal="true">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 transform transition-all duration-300 ease-out scale-95 opacity-0" id="new-key-modal-container">
+        <div class="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 class="text-xl font-bold text-gray-900">Create New API Key</h2>
+          <button type="button" class="text-gray-400 hover:text-gray-600 transition-colors duration-200" onclick="closeNewKeyModal()">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="p-6">
+          <form id="new-key-form" hx-post="/api/keys"
+                hx-on:htmx:after-request="handleCreateKeyResponse(event)"
+                onsubmit="console.log('Form submitting...'); return true;">
+            <!-- Hidden field for organization ID -->
+            <input type="hidden" id="organization-id" name="organization_id" value="">
+            <!-- Hidden field for user ID -->
+            <input type="hidden" id="user-id" name="user_id" value="">
+            
+            <!-- API Key Name -->
+            <div class="mb-4">
+              <label for="key-name" class="block text-sm font-medium text-gray-700 mb-2">API Key Name <span class="text-red-500">*</span></label>
+              <input type="text" id="key-name" name="name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Enter key name">
+            </div>
+            
+            <!-- Key Type -->
+            <div class="mb-4">
+              <label for="key-type" class="block text-sm font-medium text-gray-700 mb-2">Key Type <span class="text-red-500">*</span></label>
+              <select id="key-type" name="type" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Select key type</option>
+                <option value="production">Production</option>
+                <option value="development">Development</option>
+                <option value="testing">Testing</option>
+              </select>
+            </div>
+            
+            <!-- Max Tokens -->
+            <div class="mb-4">
+              <label for="max-tokens" class="block text-sm font-medium text-gray-700 mb-2">Max Tokens</label>
+              <input type="number" id="max-tokens" name="max_tokens" min="1000" max="1000000" step="1000" value="10000" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            
+            <!-- Permissions -->
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-3">Permissions</label>
+              <div class="space-y-2">
+                <label class="flex items-center">
+                  <input type="checkbox" name="permissions[]" value="read" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                  <span class="ml-2 text-sm text-gray-700">Read Access</span>
+                </label>
+                <label class="flex items-center">
+                  <input type="checkbox" name="permissions[]" value="write" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                  <span class="ml-2 text-sm text-gray-700">Write Access</span>
+                </label>
+                <label class="flex items-center">
+                  <input type="checkbox" name="permissions[]" value="admin" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                  <span class="ml-2 text-sm text-gray-700">Admin Access</span>
+                </label>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="flex items-center justify-end space-x-3 p-6 border-t border-gray-200">
+          <button type="button" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg" onclick="closeNewKeyModal()">Cancel</button>
+          <button type="submit" form="new-key-form" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Create Key</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+  
+  // Process HTMX for the newly added content
+  if (window.htmx) {
+    console.log('HTMX found, processing new content...');
+    htmx.process(document.getElementById('new-key-modal'));
+  } else {
+    console.error('HTMX not found! Form will not work.');
+  }
+}
+</script>

@@ -9,6 +9,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/like-mike/relai-gateway/shared/db"
 	"github.com/like-mike/relai-gateway/shared/middleware"
+	uimw "github.com/like-mike/relai-gateway/ui/middleware"
 	"github.com/like-mike/relai-gateway/ui/routes/admin"
 	"github.com/like-mike/relai-gateway/ui/routes/health"
 )
@@ -31,38 +32,84 @@ func main() {
 	r.Use(middleware.CustomLogger())
 	r.Use(gin.Recovery())
 
-	// Serve templates including partials
-	r.LoadHTMLGlob("templates/*.html")
+	// Load templates using LoadHTMLFiles to avoid conflicts
+	templateFiles := []string{
+		"templates/pages/auth/login.html",
+		"templates/pages/admin/api-keys.html",
+		"templates/pages/admin/models.html",
+		"templates/pages/admin/test-api.html",
+		"templates/pages/admin/settings.html",
+		"templates/components/ui/banner.html",
+		"templates/components/ui/sidebar.html",
+		"templates/components/ui/user-dropdown.html",
+		"templates/partials/org-selector.html",
+		"templates/partials/quota-cards.html",
+		"templates/partials/api-keys-table.html",
+		"templates/partials/organizations-table.html",
+		"templates/components/modals/api-keys/new-key-modal.html",
+		"templates/components/modals/api-keys/view-key-modal.html",
+		"templates/components/modals/api-keys/delete-confirmation-modal.html",
+		"templates/components/modals/models/add-model-modal.html",
+		"templates/components/modals/models/edit-model-modal.html",
+		"templates/components/modals/models/delete-model-modal.html",
+		"templates/components/modals/models/manage-access-modal.html",
+		"templates/components/modals/organizations/create-org-modal.html",
+		"templates/components/modals/organizations/edit-org-modal.html",
+	}
+	r.LoadHTMLFiles(templateFiles...)
 
 	// Attach DB to Gin context
 	r.Use(middleware.DBMiddleware(conn))
-	// Static health check
+
+	// Health check
 	r.GET("/health", health.Handler)
+
 	// Register public authentication routes
 	admin.RegisterPublicAuthRoutes(r, config)
 
-	// Protected routes
-	authorized := r.Group("/")
-	authorized.Use(middleware.AuthMiddlewareGin())
-	admin.RegisterAuthRoutes(authorized, config)
-
-	authorized.GET("/admin", admin.DashboardHandler)
-	authorized.GET("/admin/test-api", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "test_api.html", gin.H{"activePage": "test_api", "isAuthenticated": true})
-	})
-	authorized.GET("/quota", func(c *gin.Context) {
-		admin.GetQuotaHandler(c)
-		c.Set("isAuthenticated", true)
-	})
-	authorized.GET("/api-keys", func(c *gin.Context) {
-		admin.APIKeysHandler(c)
-		// admin.GetDropdownHandler(c)
-		c.Set("isAuthenticated", true)
-	})
-
+	// Root route redirect
 	r.GET("/", func(c *gin.Context) {
 		c.Redirect(http.StatusFound, "/admin")
 	})
+
+	// Protected routes
+	authorized := r.Group("/")
+	authorized.Use(uimw.AuthMiddlewareGin())
+	admin.RegisterAuthRoutes(authorized, config)
+
+	// Admin dashboard - API Keys page
+	authorized.GET("/admin", admin.DashboardHandler)
+	authorized.GET("/admin/models", func(c *gin.Context) {
+		userData := admin.GetUserContext(c)
+		userData["activePage"] = "models"
+		userData["title"] = "Models Management"
+		c.HTML(http.StatusOK, "models.html", userData)
+	})
+	authorized.GET("/admin/test-api", func(c *gin.Context) {
+		userData := admin.GetUserContext(c)
+		userData["activePage"] = "test_api"
+		userData["title"] = "Test API"
+		c.HTML(http.StatusOK, "test-api.html", userData)
+	})
+	authorized.GET("/admin/settings", admin.SettingsHandler)
+
+	// API endpoints with database integration
+	authorized.GET("/quota", admin.GetQuotaHandler)
+	authorized.GET("/api-keys", admin.APIKeysHandler)
+	authorized.POST("/api/keys", admin.CreateAPIKeyHandler)
+	authorized.DELETE("/api/keys/:id", admin.DeleteAPIKeyHandler)
+	authorized.GET("/api/organizations", admin.OrganizationsHandler)
+	authorized.GET("/api/models", admin.ModelsHandler)
+	authorized.POST("/api/models", admin.CreateModelHandler)
+	authorized.DELETE("/api/models/:id", admin.DeleteModelHandler)
+	authorized.POST("/api/models/:id/access", admin.ManageModelAccessHandler)
+
+	// Settings endpoints
+	authorized.GET("/admin/settings/organizations", admin.OrganizationsTableHandler)
+	authorized.POST("/admin/settings/organizations", admin.CreateOrganizationHandler)
+	authorized.GET("/admin/settings/organizations/:id", admin.GetOrganizationHandler)
+	authorized.PUT("/admin/settings/organizations/:id", admin.UpdateOrganizationHandler)
+	authorized.DELETE("/admin/settings/organizations/:id", admin.DeleteOrganizationHandler)
 
 	// Run server
 	port := os.Getenv("UI_PORT")

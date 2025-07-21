@@ -1,0 +1,423 @@
+<!-- Manage Access Modal -->
+<div id="manage-access-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden transition-opacity duration-300 ease-out" role="dialog" aria-modal="true" aria-labelledby="manage-access-title" aria-describedby="manage-access-description">
+  <!-- Modal Container -->
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto transform transition-all duration-300 ease-out scale-95 opacity-0" id="manage-access-container">
+    <!-- Modal Header -->
+    <div class="flex items-center justify-between p-6 border-b border-gray-200">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+          </svg>
+        </div>
+        <div>
+          <h2 id="manage-access-title" class="text-xl font-bold text-gray-900">Manage Organization Access</h2>
+          <p class="text-sm text-gray-600" id="manage-access-model-name">Model Name</p>
+        </div>
+      </div>
+      <button type="button" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-lg p-1" onclick="closeManageAccessModal()" aria-label="Close modal">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="p-6" id="manage-access-description">
+      <!-- Search and Filter -->
+      <div class="mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0 sm:space-x-4">
+          <!-- Search -->
+          <div class="flex-1 max-w-md">
+            <div class="relative">
+              <input type="text" id="access-org-search" placeholder="Search organizations..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" onkeyup="filterOrganizations(this.value)">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Action Buttons -->
+          <div class="flex items-center space-x-2">
+            <button type="button" onclick="selectAllAccessOrgs()" class="text-sm text-blue-600 hover:text-blue-800 font-medium">Select All</button>
+            <span class="text-gray-300">|</span>
+            <button type="button" onclick="deselectAllAccessOrgs()" class="text-sm text-gray-600 hover:text-gray-800 font-medium">Deselect All</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Organizations List -->
+      <div class="border border-gray-200 rounded-lg max-h-96 overflow-y-auto">
+        <!-- Loading State -->
+        <div id="access-orgs-loading" class="hidden p-8 text-center">
+          <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-3"></div>
+          <p class="text-gray-600">Loading organizations...</p>
+        </div>
+
+        <!-- Organizations Grid -->
+        <div id="access-orgs-list" class="divide-y divide-gray-200">
+          <!-- Organizations will be populated here -->
+        </div>
+
+        <!-- No Results -->
+        <div id="access-no-results" class="hidden p-8 text-center">
+          <p class="text-gray-500">No organizations found</p>
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="flex items-center justify-between">
+          <div class="text-sm text-blue-800">
+            <span id="selected-orgs-count">0</span> organizations selected
+          </div>
+          <div class="text-sm text-blue-600">
+            Changes will be applied immediately
+          </div>
+        </div>
+      </div>
+
+      <!-- Error Message Container -->
+      <div id="manage-access-error" class="hidden mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+        <p class="text-sm text-red-600" id="manage-access-error-message"></p>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="flex items-center justify-between p-6 border-t border-gray-200">
+      <div class="text-sm text-gray-600">
+        <span class="font-medium" id="pending-changes-count">0</span> pending changes
+      </div>
+      <div class="flex items-center space-x-3">
+        <button type="button" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2" onclick="closeManageAccessModal()">Close</button>
+        <button type="button" id="save-access-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2" onclick="saveAccessChanges()" disabled>Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Manage access modal functionality
+let manageAccessLastFocusedElement = null;
+let manageAccessFocusableElements = [];
+let currentManageModel = null;
+let allOrganizations = [];
+let filteredAccessOrganizations = [];
+let originalModelOrgs = [];
+let pendingChanges = [];
+
+function openManageAccessModal(model) {
+  // Store the model and currently focused element
+  currentManageModel = model;
+  manageAccessLastFocusedElement = document.activeElement;
+  
+  const modal = document.getElementById('manage-access-modal');
+  const modalContainer = document.getElementById('manage-access-container');
+  
+  // Set model name
+  document.getElementById('manage-access-model-name').textContent = model.name || 'Unknown Model';
+  
+  // Store original organizations for comparison
+  originalModelOrgs = (model.organizations || []).map(org => org.id);
+  
+  // Load organizations
+  loadAccessOrganizations();
+  
+  // Show modal
+  modal.classList.remove('hidden');
+  
+  // Trigger animations
+  setTimeout(() => {
+    modal.classList.add('opacity-100');
+    modalContainer.classList.remove('scale-95', 'opacity-0');
+    modalContainer.classList.add('scale-100', 'opacity-100');
+  }, 10);
+  
+  // Set up focus trapping
+  setupManageAccessFocusTrap();
+  
+  // Focus the search input
+  setTimeout(() => {
+    document.getElementById('access-org-search').focus();
+  }, 100);
+  
+  // Add event listeners
+  document.addEventListener('keydown', handleManageAccessKeyDown);
+  modal.addEventListener('click', handleManageAccessOverlayClick);
+}
+
+function closeManageAccessModal() {
+  const modal = document.getElementById('manage-access-modal');
+  const modalContainer = document.getElementById('manage-access-container');
+  
+  // Trigger close animations
+  modal.classList.remove('opacity-100');
+  modalContainer.classList.remove('scale-100', 'opacity-100');
+  modalContainer.classList.add('scale-95', 'opacity-0');
+  
+  // Hide modal after animation
+  setTimeout(() => {
+    modal.classList.add('hidden');
+    
+    // Reset state
+    currentManageModel = null;
+    pendingChanges = [];
+    document.getElementById('access-org-search').value = '';
+    hideManageAccessError();
+    
+    // Restore focus
+    if (manageAccessLastFocusedElement) {
+      manageAccessLastFocusedElement.focus();
+    }
+  }, 300);
+  
+  // Remove event listeners
+  document.removeEventListener('keydown', handleManageAccessKeyDown);
+  modal.removeEventListener('click', handleManageAccessOverlayClick);
+}
+
+function setupManageAccessFocusTrap() {
+  const modal = document.getElementById('manage-access-container');
+  manageAccessFocusableElements = modal.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  );
+}
+
+function handleManageAccessKeyDown(event) {
+  if (event.key === 'Escape') {
+    closeManageAccessModal();
+    return;
+  }
+  
+  if (event.key === 'Tab') {
+    trapManageAccessFocus(event);
+  }
+}
+
+function trapManageAccessFocus(event) {
+  const firstFocusable = manageAccessFocusableElements[0];
+  const lastFocusable = manageAccessFocusableElements[manageAccessFocusableElements.length - 1];
+  
+  if (event.shiftKey) {
+    // Shift + Tab
+    if (document.activeElement === firstFocusable) {
+      event.preventDefault();
+      lastFocusable.focus();
+    }
+  } else {
+    // Tab
+    if (document.activeElement === lastFocusable) {
+      event.preventDefault();
+      firstFocusable.focus();
+    }
+  }
+}
+
+function handleManageAccessOverlayClick(event) {
+  if (event.target === event.currentTarget) {
+    closeManageAccessModal();
+  }
+}
+
+async function loadAccessOrganizations() {
+  try {
+    showAccessOrgsLoading(true);
+    
+    const response = await fetch('/api/organizations', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    allOrganizations = data.organizations || [];
+    
+    renderAccessOrganizations();
+    updateSummary();
+
+  } catch (error) {
+    console.error('Failed to load organizations:', error);
+    showManageAccessError('Failed to load organizations');
+  } finally {
+    showAccessOrgsLoading(false);
+  }
+}
+
+function renderAccessOrganizations() {
+  filteredAccessOrganizations = [...allOrganizations];
+  renderFilteredAccessOrganizations();
+}
+
+function renderFilteredAccessOrganizations() {
+  const container = document.getElementById('access-orgs-list');
+  const noResults = document.getElementById('access-no-results');
+  
+  if (filteredAccessOrganizations.length === 0) {
+    container.innerHTML = '';
+    noResults.classList.remove('hidden');
+    return;
+  }
+  
+  noResults.classList.add('hidden');
+  
+  container.innerHTML = filteredAccessOrganizations.map(org => {
+    const isSelected = originalModelOrgs.includes(org.id) || 
+                     pendingChanges.some(change => change.orgId === org.id && change.action === 'add');
+    const isPending = pendingChanges.some(change => change.orgId === org.id);
+    
+    return `
+      <label class="flex items-center p-4 hover:bg-gray-50 cursor-pointer ${isPending ? 'bg-yellow-50' : ''}">
+        <input type="checkbox" 
+               value="${org.id}" 
+               ${isSelected ? 'checked' : ''} 
+               onchange="handleOrgToggle('${org.id}', this.checked)"
+               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+        <div class="ml-4 flex-1">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm font-medium text-gray-900">${org.name}</div>
+              <div class="text-xs text-gray-500">ID: ${org.id}</div>
+            </div>
+            <div class="flex items-center space-x-2">
+              ${isPending ? '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">Pending</span>' : ''}
+              ${isSelected && !isPending ? '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Active</span>' : ''}
+            </div>
+          </div>
+        </div>
+      </label>
+    `;
+  }).join('');
+}
+
+function filterOrganizations(query) {
+  const lowerQuery = query.toLowerCase();
+  filteredAccessOrganizations = allOrganizations.filter(org =>
+    org.name.toLowerCase().includes(lowerQuery) ||
+    org.id.toLowerCase().includes(lowerQuery)
+  );
+  
+  renderFilteredAccessOrganizations();
+}
+
+function handleOrgToggle(orgId, isChecked) {
+  const wasOriginallySelected = originalModelOrgs.includes(orgId);
+  
+  // Remove any existing pending change for this org
+  pendingChanges = pendingChanges.filter(change => change.orgId !== orgId);
+  
+  // Add new pending change if different from original state
+  if (wasOriginallySelected && !isChecked) {
+    pendingChanges.push({ orgId, action: 'remove' });
+  } else if (!wasOriginallySelected && isChecked) {
+    pendingChanges.push({ orgId, action: 'add' });
+  }
+  
+  updateSummary();
+  renderFilteredAccessOrganizations();
+}
+
+function selectAllAccessOrgs() {
+  filteredAccessOrganizations.forEach(org => {
+    const checkbox = document.querySelector(`input[value="${org.id}"]`);
+    if (checkbox && !checkbox.checked) {
+      checkbox.checked = true;
+      handleOrgToggle(org.id, true);
+    }
+  });
+}
+
+function deselectAllAccessOrgs() {
+  filteredAccessOrganizations.forEach(org => {
+    const checkbox = document.querySelector(`input[value="${org.id}"]`);
+    if (checkbox && checkbox.checked) {
+      checkbox.checked = false;
+      handleOrgToggle(org.id, false);
+    }
+  });
+}
+
+function updateSummary() {
+  const selectedCount = originalModelOrgs.length + 
+                       pendingChanges.filter(c => c.action === 'add').length - 
+                       pendingChanges.filter(c => c.action === 'remove').length;
+  
+  document.getElementById('selected-orgs-count').textContent = selectedCount;
+  document.getElementById('pending-changes-count').textContent = pendingChanges.length;
+  
+  const saveBtn = document.getElementById('save-access-btn');
+  saveBtn.disabled = pendingChanges.length === 0;
+}
+
+async function saveAccessChanges() {
+  if (!currentManageModel || pendingChanges.length === 0) return;
+  
+  // Show loading state
+  const saveBtn = document.getElementById('save-access-btn');
+  const originalText = saveBtn.textContent;
+  saveBtn.textContent = 'Saving...';
+  saveBtn.disabled = true;
+  
+  try {
+    const response = await fetch(`/api/models/${currentManageModel.id}/access`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        changes: pendingChanges
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update access permissions');
+    }
+    
+    // Success - close modal and reload models
+    closeManageAccessModal();
+    loadModels(); // Reload the main models list
+    
+  } catch (error) {
+    console.error('Failed to save access changes:', error);
+    showManageAccessError(error.message);
+    
+    // Restore button state
+    saveBtn.textContent = originalText;
+    saveBtn.disabled = false;
+  }
+}
+
+function showAccessOrgsLoading(show) {
+  const loading = document.getElementById('access-orgs-loading');
+  const list = document.getElementById('access-orgs-list');
+  
+  if (show) {
+    loading.classList.remove('hidden');
+    list.innerHTML = '';
+  } else {
+    loading.classList.add('hidden');
+  }
+}
+
+function showManageAccessError(message) {
+  const errorContainer = document.getElementById('manage-access-error');
+  const errorMessage = document.getElementById('manage-access-error-message');
+  
+  errorMessage.textContent = message;
+  errorContainer.classList.remove('hidden');
+}
+
+function hideManageAccessError() {
+  const errorContainer = document.getElementById('manage-access-error');
+  errorContainer.classList.add('hidden');
+}
+</script>
