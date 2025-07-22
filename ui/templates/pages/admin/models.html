@@ -3,9 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Models Management - RelAI Gateway</title>
+  <title>Models + Endpoints - RelAI Gateway</title>
   <script src="https://unpkg.com/htmx.org@1.9.5"></script>
   <link href="https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  
+  <!-- Dynamic Theme CSS -->
+  <link href="/theme.css" rel="stylesheet">
 </head>
 <body class="h-full text-gray-900">
   <!-- Banner/Header -->
@@ -21,19 +24,43 @@
       <!-- Page Header -->
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Models Management</h1>
-          <p class="text-gray-600 mt-1">Manage AI models and their organization access permissions</p>
+          <h1 class="text-2xl font-bold text-gray-900">Models + Endpoints</h1>
+          <p class="text-gray-600 mt-1">Manage AI models and custom API endpoints</p>
         </div>
-        <button onclick="openAddModelModal()" class="bg-blue-600 text-white px-4 py-2 text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-          <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-          </svg>
-          Add Model
-        </button>
+        <div class="flex space-x-3">
+          <button id="add-model-btn" onclick="openAddModelModal()" class="bg-blue-600 text-white px-4 py-2 text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Add Model
+          </button>
+          <button id="add-endpoint-btn" onclick="openAddEndpointModal()" class="bg-green-600 text-white px-4 py-2 text-sm font-medium rounded-lg hover:bg-green-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2" style="display: none;">
+            <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Add Endpoint
+          </button>
+        </div>
       </div>
 
-      <!-- Search and Filters -->
-      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+      <!-- Tab Navigation -->
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="border-b border-gray-200">
+          <nav class="-mb-px flex space-x-8 px-6">
+            <button onclick="switchTab('models')" id="models-tab" class="py-4 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600">
+              Models
+            </button>
+            <button onclick="switchTab('endpoints')" id="endpoints-tab" class="py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+              Custom Endpoints
+            </button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- Models Tab Content -->
+      <div id="models-content" class="tab-content">
+        <!-- Search and Filters -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0 md:space-x-4">
           <!-- Search -->
           <div class="flex-1 max-w-lg">
@@ -114,6 +141,92 @@
           </div>
         </div>
       </div>
+
+      <!-- Endpoints Tab Content -->
+      <div id="endpoints-content" class="tab-content hidden">
+        <!-- Search and Filters for Endpoints -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0 md:space-x-4">
+            <!-- Search -->
+            <div class="flex-1 max-w-lg">
+              <div class="relative">
+                <input type="text" id="endpoint-search" placeholder="Search endpoints..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" onkeyup="debounceEndpointSearch(this.value)">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="flex items-center space-x-3">
+              <select id="endpoint-org-filter" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" onchange="applyEndpointFilters()">
+                <option value="">All Organizations</option>
+                <!-- Options will be populated by JavaScript -->
+              </select>
+              <select id="endpoint-status-filter" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" onchange="applyEndpointFilters()">
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              <button onclick="clearEndpointFilters()" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Endpoints Grid -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+          <!-- Loading State -->
+          <div id="endpoints-loading" class="hidden p-8 text-center">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-3"></div>
+            <p class="text-gray-600">Loading endpoints...</p>
+          </div>
+
+          <!-- Error State -->
+          <div id="endpoints-error" class="hidden p-8 text-center">
+            <div class="text-red-600 mb-3">
+              <svg class="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <p class="text-gray-700 mb-3">Failed to load endpoints</p>
+            <button onclick="loadEndpoints()" class="text-green-600 hover:text-green-800 font-medium">Try again</button>
+          </div>
+
+          <!-- Endpoints Grid -->
+          <div id="endpoints-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+            <!-- Endpoint cards will be populated here -->
+          </div>
+
+          <!-- Empty State -->
+          <div id="endpoints-empty" class="hidden p-8 text-center">
+            <div class="text-gray-400 mb-3">
+              <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              </svg>
+            </div>
+            <p class="text-gray-600 mb-3">No endpoints found</p>
+            <button onclick="openAddEndpointModal()" class="text-green-600 hover:text-green-800 font-medium">Add your first endpoint</button>
+          </div>
+
+          <!-- Pagination -->
+          <div id="endpoints-pagination" class="hidden border-t border-gray-200 px-6 py-4">
+            <div class="flex items-center justify-between">
+              <div class="text-sm text-gray-700">
+                Showing <span id="endpoint-page-start">1</span> to <span id="endpoint-page-end">10</span> of <span id="endpoint-total-count">0</span> endpoints
+              </div>
+              <div class="flex items-center space-x-2">
+                <button id="endpoint-prev-btn" onclick="changeEndpointPage(-1)" class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                <span id="endpoint-page-numbers" class="flex items-center space-x-1">
+                  <!-- Page numbers will be populated here -->
+                </span>
+                <button id="endpoint-next-btn" onclick="changeEndpointPage(1)" class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 
@@ -122,8 +235,16 @@
   {{template "edit-model-modal.html" .}}
   {{template "delete-model-modal.html" .}}
   {{template "manage-access-modal.html" .}}
+  
+  <!-- Include Endpoint Modals -->
+  {{template "add-endpoint-modal.html" .}}
+  {{template "edit-endpoint-modal.html" .}}
+  {{template "delete-endpoint-modal.html" .}}
 
   <script>
+    // Global state
+    let currentTab = 'models';
+    
     // Models management state
     let currentModels = [];
     let filteredModels = [];
@@ -135,11 +256,54 @@
     let statusFilter = '';
     let searchTimeout;
 
+    // Endpoints management state
+    let currentEndpoints = [];
+    let filteredEndpoints = [];
+    let currentEndpointPage = 1;
+    let endpointPageSize = 9;
+    let totalEndpoints = 0;
+    let endpointSearchQuery = '';
+    let endpointOrgFilter = '';
+    let endpointStatusFilter = '';
+    let endpointSearchTimeout;
+
     // Initialize page
     document.addEventListener('DOMContentLoaded', function() {
       loadModels();
       loadOrganizations();
+      loadEndpoints();
     });
+
+    // Tab switching functionality
+    function switchTab(tabName) {
+      currentTab = tabName;
+      
+      // Update tab buttons
+      const modelsTab = document.getElementById('models-tab');
+      const endpointsTab = document.getElementById('endpoints-tab');
+      const modelsContent = document.getElementById('models-content');
+      const endpointsContent = document.getElementById('endpoints-content');
+      const addModelBtn = document.getElementById('add-model-btn');
+      const addEndpointBtn = document.getElementById('add-endpoint-btn');
+      
+      if (tabName === 'models') {
+        // Models tab active
+        modelsTab.className = 'py-4 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600';
+        endpointsTab.className = 'py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300';
+        modelsContent.classList.remove('hidden');
+        endpointsContent.classList.add('hidden');
+        addModelBtn.style.display = 'block';
+        addEndpointBtn.style.display = 'none';
+      } else {
+        // Endpoints tab active
+        modelsTab.className = 'py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300';
+        endpointsTab.className = 'py-4 px-1 border-b-2 border-green-500 font-medium text-sm text-green-600';
+        modelsContent.classList.add('hidden');
+        endpointsContent.classList.remove('hidden');
+        addModelBtn.style.display = 'none';
+        addEndpointBtn.style.display = 'block';
+      }
+    }
 
     async function loadModels() {
       try {
@@ -194,17 +358,30 @@
 
     function populateOrgFilter(organizations) {
       const orgFilter = document.getElementById('org-filter');
+      const endpointOrgFilter = document.getElementById('endpoint-org-filter');
       
-      // Clear existing options except the first one
+      // Clear existing options except the first one for models filter
       while (orgFilter.children.length > 1) {
         orgFilter.removeChild(orgFilter.lastChild);
       }
       
+      // Clear existing options except the first one for endpoints filter
+      while (endpointOrgFilter.children.length > 1) {
+        endpointOrgFilter.removeChild(endpointOrgFilter.lastChild);
+      }
+      
       organizations.forEach(org => {
-        const option = document.createElement('option');
-        option.value = org.id;
-        option.textContent = org.name;
-        orgFilter.appendChild(option);
+        // Add to models filter
+        const modelOption = document.createElement('option');
+        modelOption.value = org.id;
+        modelOption.textContent = org.name;
+        orgFilter.appendChild(modelOption);
+        
+        // Add to endpoints filter
+        const endpointOption = document.createElement('option');
+        endpointOption.value = org.id;
+        endpointOption.textContent = org.name;
+        endpointOrgFilter.appendChild(endpointOption);
       });
     }
 
@@ -311,6 +488,17 @@
               ${orgBadges}${remainingBadge}
               ${(model.organizations || []).length === 0 ? '<span class="text-sm text-gray-500">No organizations assigned</span>' : ''}
             </div>
+          </div>
+          
+          <div class="mb-4">
+            <div class="text-sm text-gray-500 mb-2">Cost (USD/1M tokens):</div>
+            ${model.input_cost_per_1m && model.output_cost_per_1m ?
+              `<div class="text-xs bg-gray-50 rounded px-3 py-2">
+                <div>Input: $${parseFloat(model.input_cost_per_1m).toFixed(2)}</div>
+                <div>Output: $${parseFloat(model.output_cost_per_1m).toFixed(2)}</div>
+              </div>` :
+              '<span class="text-sm text-gray-400">Not configured</span>'
+            }
           </div>
           
           <div class="text-xs text-gray-500">
@@ -454,11 +642,277 @@
 
     // Close dropdown menus when clicking outside
     document.addEventListener('click', function(event) {
-      if (!event.target.closest('[id^="menu-"]') && !event.target.closest('button[onclick^="toggleModelMenu"]')) {
+      if (!event.target.closest('[id^="menu-"]') && !event.target.closest('button[onclick^="toggleModelMenu"]') && !event.target.closest('button[onclick^="toggleEndpointMenu"]')) {
         document.querySelectorAll('[id^="menu-"]').forEach(menu => {
           menu.classList.add('hidden');
         });
       }
+    });
+
+    // Endpoints management functions
+    async function loadEndpoints() {
+      try {
+        showEndpointsLoading(true);
+        hideEndpointsError();
+
+        const response = await fetch('/api/endpoints', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        currentEndpoints = data.endpoints || [];
+        applyEndpointFilters();
+
+      } catch (error) {
+        console.error('Failed to load endpoints:', error);
+        showEndpointsError();
+      } finally {
+        showEndpointsLoading(false);
+      }
+    }
+
+    function applyEndpointFilters() {
+      filteredEndpoints = currentEndpoints.filter(endpoint => {
+        // Search filter
+        if (endpointSearchQuery) {
+          const searchLower = endpointSearchQuery.toLowerCase();
+          const matchesSearch = endpoint.name.toLowerCase().includes(searchLower) ||
+                              (endpoint.description && endpoint.description.toLowerCase().includes(searchLower)) ||
+                              endpoint.path_prefix.toLowerCase().includes(searchLower);
+          if (!matchesSearch) return false;
+        }
+
+        // Organization filter
+        if (endpointOrgFilter) {
+          if (endpoint.organization_id !== endpointOrgFilter) return false;
+        }
+
+        // Status filter
+        if (endpointStatusFilter) {
+          if (endpointStatusFilter === 'active' && !endpoint.is_active) return false;
+          if (endpointStatusFilter === 'inactive' && endpoint.is_active) return false;
+        }
+
+        return true;
+      });
+
+      totalEndpoints = filteredEndpoints.length;
+      currentEndpointPage = 1;
+      renderEndpoints();
+      updateEndpointPagination();
+    }
+
+    function renderEndpoints() {
+      const grid = document.getElementById('endpoints-grid');
+      const empty = document.getElementById('endpoints-empty');
+      const pagination = document.getElementById('endpoints-pagination');
+
+      if (filteredEndpoints.length === 0) {
+        grid.innerHTML = '';
+        empty.classList.remove('hidden');
+        pagination.classList.add('hidden');
+        return;
+      }
+
+      empty.classList.add('hidden');
+      pagination.classList.remove('hidden');
+
+      const startIndex = (currentEndpointPage - 1) * endpointPageSize;
+      const endIndex = Math.min(startIndex + endpointPageSize, filteredEndpoints.length);
+      const pageEndpoints = filteredEndpoints.slice(startIndex, endIndex);
+
+      grid.innerHTML = pageEndpoints.map(endpoint => createEndpointCard(endpoint)).join('');
+    }
+
+    function createEndpointCard(endpoint) {
+      const primaryModel = endpoint.primary_model_name || 'No primary model';
+      const fallbackModel = endpoint.fallback_model_name || 'No fallback';
+      
+      return `
+        <div class="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow duration-200">
+          <div class="flex items-start justify-between mb-3">
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-teal-600 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">${endpoint.name}</h3>
+                <p class="text-sm text-gray-600">${endpoint.description || 'No description'}</p>
+              </div>
+            </div>
+            <div class="flex items-center space-x-2">
+              <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${endpoint.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                ${endpoint.is_active ? 'Active' : 'Inactive'}
+              </span>
+              <div class="relative">
+                <button onclick="toggleEndpointMenu('${endpoint.id}')" class="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                  </svg>
+                </button>
+                <div id="menu-${endpoint.id}" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+                  <div class="py-1">
+                    <button onclick="editEndpoint('${endpoint.id}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Edit Endpoint</button>
+                    <button onclick="deleteEndpoint('${endpoint.id}')" class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Delete Endpoint</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mb-4">
+            <div class="text-sm text-gray-500 mb-2">Endpoint Path:</div>
+            <div class="bg-gray-50 rounded px-3 py-2 font-mono text-sm">/api/${endpoint.path_prefix}</div>
+          </div>
+          
+          <div class="mb-4">
+            <div class="text-sm text-gray-500 mb-2">Models:</div>
+            <div class="space-y-1">
+              <div class="text-xs"><span class="font-medium">Primary:</span> ${primaryModel}</div>
+              <div class="text-xs"><span class="font-medium">Fallback:</span> ${fallbackModel}</div>
+            </div>
+          </div>
+          
+          <div class="text-xs text-gray-500">
+            Created: ${new Date(endpoint.created_at).toLocaleDateString()}
+          </div>
+        </div>
+      `;
+    }
+
+    function updateEndpointPagination() {
+      const totalPages = Math.ceil(totalEndpoints / endpointPageSize);
+      const startItem = (currentEndpointPage - 1) * endpointPageSize + 1;
+      const endItem = Math.min(currentEndpointPage * endpointPageSize, totalEndpoints);
+
+      document.getElementById('endpoint-page-start').textContent = startItem;
+      document.getElementById('endpoint-page-end').textContent = endItem;
+      document.getElementById('endpoint-total-count').textContent = totalEndpoints;
+
+      document.getElementById('endpoint-prev-btn').disabled = currentEndpointPage === 1;
+      document.getElementById('endpoint-next-btn').disabled = currentEndpointPage === totalPages;
+
+      // Update page numbers
+      const pageNumbers = document.getElementById('endpoint-page-numbers');
+      pageNumbers.innerHTML = '';
+      
+      for (let i = Math.max(1, currentEndpointPage - 2); i <= Math.min(totalPages, currentEndpointPage + 2); i++) {
+        const button = document.createElement('button');
+        button.textContent = i;
+        button.className = `px-3 py-1 text-sm border rounded ${i === currentEndpointPage ? 'bg-green-600 text-white border-green-600' : 'border-gray-300 hover:bg-gray-50'}`;
+        button.onclick = () => goToEndpointPage(i);
+        pageNumbers.appendChild(button);
+      }
+    }
+
+    function changeEndpointPage(direction) {
+      const totalPages = Math.ceil(totalEndpoints / endpointPageSize);
+      const newPage = currentEndpointPage + direction;
+      
+      if (newPage >= 1 && newPage <= totalPages) {
+        currentEndpointPage = newPage;
+        renderEndpoints();
+        updateEndpointPagination();
+      }
+    }
+
+    function goToEndpointPage(page) {
+      currentEndpointPage = page;
+      renderEndpoints();
+      updateEndpointPagination();
+    }
+
+    function debounceEndpointSearch(query) {
+      clearTimeout(endpointSearchTimeout);
+      endpointSearchTimeout = setTimeout(() => {
+        endpointSearchQuery = query;
+        applyEndpointFilters();
+      }, 300);
+    }
+
+    function clearEndpointFilters() {
+      document.getElementById('endpoint-search').value = '';
+      document.getElementById('endpoint-org-filter').value = '';
+      document.getElementById('endpoint-status-filter').value = '';
+      endpointSearchQuery = '';
+      endpointOrgFilter = '';
+      endpointStatusFilter = '';
+      applyEndpointFilters();
+    }
+
+    function toggleEndpointMenu(endpointId) {
+      const menu = document.getElementById(`menu-${endpointId}`);
+      // Close all other menus
+      document.querySelectorAll('[id^="menu-"]').forEach(m => {
+        if (m.id !== `menu-${endpointId}`) {
+          m.classList.add('hidden');
+        }
+      });
+      menu.classList.toggle('hidden');
+    }
+
+    function editEndpoint(endpointId) {
+      const endpoint = currentEndpoints.find(e => e.id === endpointId);
+      if (endpoint) {
+        openEditEndpointModal(endpoint);
+      }
+    }
+
+    function deleteEndpoint(endpointId) {
+      const endpoint = currentEndpoints.find(e => e.id === endpointId);
+      if (endpoint) {
+        openDeleteEndpointModal(endpoint);
+      }
+    }
+
+    function showEndpointsLoading(show) {
+      const loading = document.getElementById('endpoints-loading');
+      const grid = document.getElementById('endpoints-grid');
+      const pagination = document.getElementById('endpoints-pagination');
+      
+      if (show) {
+        loading.classList.remove('hidden');
+        grid.innerHTML = '';
+        pagination.classList.add('hidden');
+      } else {
+        loading.classList.add('hidden');
+      }
+    }
+
+    function showEndpointsError() {
+      const error = document.getElementById('endpoints-error');
+      const grid = document.getElementById('endpoints-grid');
+      const pagination = document.getElementById('endpoints-pagination');
+      
+      error.classList.remove('hidden');
+      grid.innerHTML = '';
+      pagination.classList.add('hidden');
+    }
+
+    function hideEndpointsError() {
+      const error = document.getElementById('endpoints-error');
+      error.classList.add('hidden');
+    }
+
+    // Update filters when dropdowns change
+    document.getElementById('endpoint-org-filter').addEventListener('change', function() {
+      endpointOrgFilter = this.value;
+      applyEndpointFilters();
+    });
+
+    document.getElementById('endpoint-status-filter').addEventListener('change', function() {
+      endpointStatusFilter = this.value;
+      applyEndpointFilters();
     });
   </script>
 </body>

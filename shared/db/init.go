@@ -74,8 +74,8 @@ func initializeSchema(db *sql.DB) error {
 	// Check if the organizations table exists
 	var exists bool
 	query := `SELECT EXISTS (
-		SELECT FROM information_schema.tables 
-		WHERE table_schema = 'public' 
+		SELECT FROM information_schema.tables
+		WHERE table_schema = 'public'
 		AND table_name = 'organizations'
 	);`
 
@@ -87,49 +87,129 @@ func initializeSchema(db *sql.DB) error {
 	// If tables don't exist, create them
 	if !exists {
 		log.Println("Database schema not found, initializing...")
-
-		// Get the current working directory
-		wd, err := os.Getwd()
+		err = createSchema(db)
 		if err != nil {
-			return fmt.Errorf("failed to get working directory: %w", err)
+			return err
 		}
-
-		// Try different possible paths for the schema file
-		schemaPaths := []string{
-			filepath.Join(wd, "shared", "db", "schema.sql"),
-			filepath.Join(wd, "..", "shared", "db", "schema.sql"),
-			filepath.Join(wd, "..", "..", "shared", "db", "schema.sql"),
-			"shared/db/schema.sql",
-		}
-
-		var schemaContent []byte
-		var schemaPath string
-
-		for _, path := range schemaPaths {
-			if _, err := os.Stat(path); err == nil {
-				schemaContent, err = ioutil.ReadFile(path)
-				if err == nil {
-					schemaPath = path
-					break
-				}
-			}
-		}
-
-		if schemaContent == nil {
-			return fmt.Errorf("schema.sql file not found in any of the expected locations: %v", schemaPaths)
-		}
-
-		log.Printf("Loading schema from: %s", schemaPath)
-
-		// Execute the schema
-		_, err = db.Exec(string(schemaContent))
-		if err != nil {
-			return fmt.Errorf("failed to execute schema: %w", err)
-		}
-
 		log.Println("Database schema initialized successfully")
 	} else {
-		log.Println("Database schema already exists")
+		log.Println("Database schema already exists, checking for updates...")
+		err = updateSchema(db)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func createSchema(db *sql.DB) error {
+	// Get the current working directory
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	// Try different possible paths for the schema file
+	schemaPaths := []string{
+		filepath.Join(wd, "shared", "db", "schema.sql"),
+		filepath.Join(wd, "..", "shared", "db", "schema.sql"),
+		filepath.Join(wd, "..", "..", "shared", "db", "schema.sql"),
+		"shared/db/schema.sql",
+	}
+
+	var schemaContent []byte
+	var schemaPath string
+
+	for _, path := range schemaPaths {
+		if _, err := os.Stat(path); err == nil {
+			schemaContent, err = ioutil.ReadFile(path)
+			if err == nil {
+				schemaPath = path
+				break
+			}
+		}
+	}
+
+	if schemaContent == nil {
+		return fmt.Errorf("schema.sql file not found in any of the expected locations: %v", schemaPaths)
+	}
+
+	log.Printf("Loading schema from: %s", schemaPath)
+
+	// Execute the schema
+	_, err = db.Exec(string(schemaContent))
+	if err != nil {
+		return fmt.Errorf("failed to execute schema: %w", err)
+	}
+
+	return nil
+}
+
+func updateSchema(db *sql.DB) error {
+	// Check if models table has api_endpoint and api_token columns
+	var hasAPIEndpoint bool
+	var hasAPIToken bool
+
+	checkColumnQuery := `SELECT EXISTS (
+		SELECT FROM information_schema.columns
+		WHERE table_schema = 'public'
+		AND table_name = 'models'
+		AND column_name = $1
+	);`
+
+	err := db.QueryRow(checkColumnQuery, "api_endpoint").Scan(&hasAPIEndpoint)
+	if err != nil {
+		return fmt.Errorf("failed to check api_endpoint column: %w", err)
+	}
+
+	err = db.QueryRow(checkColumnQuery, "api_token").Scan(&hasAPIToken)
+	if err != nil {
+		return fmt.Errorf("failed to check api_token column: %w", err)
+	}
+
+	// Add missing columns
+	if !hasAPIEndpoint {
+		log.Println("Adding api_endpoint column to models table...")
+		_, err = db.Exec("ALTER TABLE models ADD COLUMN api_endpoint VARCHAR(500)")
+		if err != nil {
+			return fmt.Errorf("failed to add api_endpoint column: %w", err)
+		}
+	}
+
+	if !hasAPIToken {
+		log.Println("Adding api_token column to models table...")
+		_, err = db.Exec("ALTER TABLE models ADD COLUMN api_token VARCHAR(500)")
+		if err != nil {
+			return fmt.Errorf("failed to add api_token column: %w", err)
+		}
+	}
+
+	// Remove unique constraint on model_id if it exists
+	var hasUniqueConstraint bool
+	constraintQuery := `SELECT EXISTS (
+		SELECT FROM information_schema.table_constraints
+		WHERE table_schema = 'public'
+		AND table_name = 'models'
+		AND constraint_type = 'UNIQUE'
+		AND constraint_name = 'models_model_id_key'
+	);`
+
+	err = db.QueryRow(constraintQuery).Scan(&hasUniqueConstraint)
+	if err != nil {
+		return fmt.Errorf("failed to check unique constraint: %w", err)
+	}
+
+	if hasUniqueConstraint {
+		log.Println("Removing unique constraint on model_id...")
+		_, err = db.Exec("ALTER TABLE models DROP CONSTRAINT models_model_id_key")
+		if err != nil {
+			return fmt.Errorf("failed to drop unique constraint: %w", err)
+		}
+	}
+
+	if !hasAPIEndpoint || !hasAPIToken || hasUniqueConstraint {
+		log.Println("Schema updated successfully")
 	}
 
 	return nil

@@ -8,9 +8,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/like-mike/relai-gateway/gateway/middleware"
 	"github.com/like-mike/relai-gateway/gateway/provider"
+	"github.com/like-mike/relai-gateway/shared/usage"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -19,6 +23,54 @@ func prepareRequest(cfg *provider.ProxyConfig, c *gin.Context, target string) (*
 	bodyBytes, _ := io.ReadAll(c.Request.Body)
 	c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
+	// 1. Detect the model requested in the body
+	modelName, err := DetectModel(bodyBytes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to detect model: %w", err)
+	}
+
+	fmt.Println("Did you get this far? Model detected:", modelName)
+
+	// 2. Get accessible models from auth middleware context
+	accessibleModelsInterface, exists := c.Get("accessible_models")
+	if !exists {
+		return nil, nil, fmt.Errorf("no accessible models found in context - authentication required")
+	}
+
+	accessibleModels, ok := accessibleModelsInterface.([]middleware.AccessibleModel)
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid accessible models format in context")
+	}
+
+	// 3. Check if organization has access to the requested model and get its API token
+	var modelApiToken string
+	var accessibleModelID string
+	var hasAccess bool
+	for _, accessibleModel := range accessibleModels {
+		if accessibleModel.ModelID == modelName {
+			hasAccess = true
+			modelApiToken = accessibleModel.ApiToken
+			accessibleModelID = accessibleModel.ID
+			log.Printf("Organization has access to model %s (provider: %s)", modelName, accessibleModel.Provider)
+			break
+		}
+	}
+
+	if !hasAccess {
+		return nil, nil, fmt.Errorf("organization does not have access to model: %s", modelName)
+	}
+
+	// Store model ID in context for usage logging
+	c.Set("model_id", accessibleModelID)
+
+	// Store request body for tokenizer fallback in streaming responses
+	c.Set("request_body", bodyBytes)
+
+	// Get organization ID for logging
+	organizationID, _ := c.Get("organization_id")
+	log.Printf("Request authenticated - Model: %s, Organization: %v", modelName, organizationID)
+
+	// 4. Prepare the upstream request
 	dummyBackend := os.Getenv("USE_DUMMY_BACKEND")
 	var baseURL string
 	if dummyBackend == "1" {
@@ -28,7 +80,6 @@ func prepareRequest(cfg *provider.ProxyConfig, c *gin.Context, target string) (*
 			return nil, nil, fmt.Errorf("DUMMY_BACKEND_HOST environment variable is not set")
 		}
 	} else {
-		// config := provider.NewProxyConfigFromEnv("openai")
 		baseURL = cfg.BaseURL
 	}
 
@@ -37,25 +88,20 @@ func prepareRequest(cfg *provider.ProxyConfig, c *gin.Context, target string) (*
 		return nil, nil, err
 	}
 
+	// Copy headers from original request
 	for k, v := range c.Request.Header {
 		for _, vv := range v {
-			req.Header.Add(k, vv)
+			if k != "Authorization" {
+				req.Header.Add(k, vv)
+			}
+
 		}
 	}
 
-	body, _ := io.ReadAll(c.Request.Body)
-
-	modelName, err := DetectModel(body)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to detect model: %w", err)
-	}
-
-	// modelName := "gpt-4.1"
-
-	model := provider.ModelMap[modelName]
-
+	// 5. Set the correct API token for the model (not dummy backend)
 	if dummyBackend != "1" {
-		req.Header.Set("Authorization", "Bearer "+model.SecretKey)
+		req.Header.Set("Authorization", "Bearer "+modelApiToken)
+		log.Printf("Using model-specific API token for %s", modelName)
 	}
 
 	return req, bodyBytes, nil
@@ -75,7 +121,7 @@ func DetectModel(jsonInput []byte) (string, error) {
 	return req.Model, nil
 }
 
-func writeDownstreamResponse(c *gin.Context, resp *http.Response, err error, tracer trace.Tracer) {
+func writeDownstreamResponse(c *gin.Context, resp *http.Response, err error, tracer trace.Tracer, startTime time.Time) {
 	_, span := tracer.Start(c.Request.Context(), "build_response")
 	defer span.End()
 
@@ -85,17 +131,34 @@ func writeDownstreamResponse(c *gin.Context, resp *http.Response, err error, tra
 			attribute.Int("http.status_code", http.StatusBadGateway),
 		)
 		c.String(http.StatusBadGateway, "failed to reach provider")
+
+		// Track the failed request
+		c.Status(http.StatusBadGateway)
+		errorResponse := []byte(`{"error": {"message": "failed to reach provider", "type": "gateway_error"}}`)
+		trackUsageFromResponse(c, errorResponse, startTime)
 		return
 	}
 	defer resp.Body.Close()
 
+	// Read response body for usage extraction
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		span.SetAttributes(attribute.String("error.message", err.Error()))
+		c.String(http.StatusInternalServerError, "failed to read provider response")
+
+		// Track the failed request
+		c.Status(http.StatusInternalServerError)
+		errorResponse := []byte(`{"error": {"message": "failed to read provider response", "type": "gateway_error"}}`)
+		trackUsageFromResponse(c, errorResponse, startTime)
+		return
+	}
+
+	// Copy headers to client
 	for hk, hv := range resp.Header {
 		for _, v := range hv {
 			if hk != "Set-Cookie" {
 				c.Writer.Header().Add(hk, v)
-				// fmt.Println(hk, v)
 			}
-
 		}
 	}
 
@@ -109,9 +172,115 @@ func writeDownstreamResponse(c *gin.Context, resp *http.Response, err error, tra
 		span.SetAttributes(attribute.String("error.message", http.StatusText(resp.StatusCode)))
 	}
 
-	if _, err = io.Copy(c.Writer, resp.Body); err != nil {
+	// Write response body to client
+	if _, err = c.Writer.Write(responseBody); err != nil {
 		span.SetAttributes(attribute.String("error.message", err.Error()))
 		c.String(http.StatusInternalServerError, "failed to stream provider response")
 		return
 	}
+
+	// Track usage for all responses (both successful and failed)
+	// Debug: log response characteristics for streaming detection
+	if len(responseBody) > 0 {
+		isStreaming := strings.Contains(string(responseBody[:min(100, len(responseBody))]), "data:")
+		log.Printf("Response tracking - Length: %d, IsStreaming: %v, Status: %d", len(responseBody), isStreaming, resp.StatusCode)
+	}
+	trackUsageFromResponse(c, responseBody, startTime)
+}
+
+// Helper function for min
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// trackUsageFromResponse extracts and tracks usage from the provider response
+func trackUsageFromResponse(c *gin.Context, responseBody []byte, startTime time.Time) {
+	// Get context data for usage tracking
+	orgID, _ := c.Get("organization_id")
+	apiKeyID, _ := c.Get("api_key_id")
+	modelID, _ := c.Get("model_id")
+
+	orgIDStr, ok1 := orgID.(string)
+	apiKeyIDStr, ok2 := apiKeyID.(string)
+	modelIDStr, ok3 := modelID.(string)
+
+	if !ok1 || !ok2 || !ok3 {
+		log.Printf("Missing required context for usage tracking: org=%v, apiKey=%v, model=%v", ok1, ok2, ok3)
+		return
+	}
+
+	// Determine provider from accessible models
+	provider := "unknown"
+	accessibleModelsInterface, exists := c.Get("accessible_models")
+	if exists {
+		if accessibleModels, ok := accessibleModelsInterface.([]middleware.AccessibleModel); ok {
+			for _, model := range accessibleModels {
+				if model.ID == modelIDStr {
+					provider = model.Provider
+					break
+				}
+			}
+		}
+	}
+
+	// Calculate response time
+	responseTimeMS := int(time.Since(startTime).Milliseconds())
+
+	// Get endpoint from request
+	endpoint := c.Request.URL.Path
+
+	// Extract request ID from response headers (if available)
+	var requestID *string
+	if reqID := c.Writer.Header().Get("X-Request-Id"); reqID != "" {
+		requestID = &reqID
+	}
+
+	// Check if this is a streaming response - use tiktoken for all streaming
+	isStreaming := len(responseBody) > 0 && strings.Contains(string(responseBody[:min(100, len(responseBody))]), "data:")
+
+	if isStreaming {
+		// Use tiktoken for streaming responses
+		if requestBody, exists := c.Get("request_body"); exists {
+			if requestBodyBytes, ok := requestBody.([]byte); ok {
+				log.Printf("Using tiktoken for streaming response (model: %s)", modelIDStr)
+				trackUsageWithTokenizer(
+					orgIDStr, apiKeyIDStr, modelIDStr, provider, endpoint,
+					requestID, c.Writer.Status(), &responseTimeMS,
+					responseBody, requestBodyBytes,
+				)
+				return
+			}
+		}
+		log.Printf("Streaming detected but no request body available for tiktoken")
+	}
+
+	// Use standard tracking for non-streaming responses
+	usage.TrackUsage(
+		orgIDStr,
+		apiKeyIDStr,
+		modelIDStr,
+		provider,
+		endpoint,
+		requestID,
+		c.Writer.Status(),
+		&responseTimeMS,
+		responseBody,
+	)
+}
+
+// trackUsageWithTokenizer uses tiktoken for accurate streaming response tracking
+func trackUsageWithTokenizer(
+	orgID, apiKeyID, modelID, provider, endpoint string,
+	requestID *string, responseStatus int, responseTimeMS *int,
+	responseBody []byte, requestBody []byte,
+) {
+	// Use tiktoken for accurate token counting
+	usage.TrackUsageWithTiktoken(
+		orgID, apiKeyID, modelID, provider, endpoint,
+		requestID, responseStatus, responseTimeMS,
+		responseBody, requestBody,
+	)
 }

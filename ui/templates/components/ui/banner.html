@@ -4,7 +4,14 @@
     <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
     </svg>
-    <span class="text-2xl font-extrabold tracking-wide">RelAI Gateway</span>
+    <span class="text-2xl font-extrabold tracking-wide">{{if .Config}}{{.Config.App.Name}}{{else}}RelAI Gateway{{end}}</span>
   </div>
-  {{ template "user-dropdown.html" . }}
+  
+  <!-- Right side with Docs link and user dropdown -->
+  <div class="flex items-center space-x-4">
+    <a href="/admin/docs" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200{{if eq .activePage "docs"}} text-blue-400{{end}}">
+      API Documentation
+    </a>
+    {{ template "user-dropdown.html" . }}
+  </div>
 </header>

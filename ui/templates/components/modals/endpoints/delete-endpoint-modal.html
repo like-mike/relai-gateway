@@ -1,0 +1,228 @@
+<!-- Delete Endpoint Modal -->
+<div id="delete-endpoint-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden transition-opacity duration-300 ease-out" role="dialog" aria-modal="true" aria-labelledby="delete-endpoint-title" aria-describedby="delete-endpoint-description">
+  <!-- Modal Container -->
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 transform transition-all duration-300 ease-out scale-95 opacity-0" id="delete-endpoint-container">
+    <!-- Modal Header -->
+    <div class="flex items-center justify-between p-6 border-b border-gray-200">
+      <h2 id="delete-endpoint-title" class="text-xl font-bold text-gray-900">Delete Endpoint</h2>
+      <button type="button" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-lg p-1" onclick="closeDeleteEndpointModal()" aria-label="Close modal">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="p-6" id="delete-endpoint-description">
+      <div class="flex items-center mb-4">
+        <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+          <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+        </div>
+      </div>
+      
+      <div class="text-center">
+        <h3 class="text-lg font-medium text-gray-900 mb-2">Are you sure?</h3>
+        <p class="text-sm text-gray-500 mb-2">
+          You are about to delete the endpoint "<span id="delete-endpoint-name" class="font-semibold"></span>".
+        </p>
+        <p class="text-sm text-gray-500 mb-4">
+          This action cannot be undone. The endpoint will be deactivated and no longer accessible.
+        </p>
+        
+        <!-- Endpoint Details -->
+        <div class="bg-gray-50 rounded-lg p-3 mb-4 text-left">
+          <div class="text-xs text-gray-500 mb-1">Endpoint Path:</div>
+          <div class="text-sm font-mono bg-white px-2 py-1 rounded border">
+            /api/<span id="delete-endpoint-path"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error Message Container -->
+      <div id="delete-endpoint-error" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+        <p class="text-sm text-red-600" id="delete-endpoint-error-message"></p>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="flex items-center justify-end space-x-3 p-6 border-t border-gray-200">
+      <button type="button" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2" onclick="closeDeleteEndpointModal()">Cancel</button>
+      <button type="button" id="confirm-delete-endpoint" class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">Delete Endpoint</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Delete endpoint modal functionality
+let deleteEndpointLastFocusedElement = null;
+let deleteEndpointFocusableElements = [];
+let currentDeletingEndpoint = null;
+
+function openDeleteEndpointModal(endpoint) {
+  // Store the endpoint and currently focused element
+  currentDeletingEndpoint = endpoint;
+  deleteEndpointLastFocusedElement = document.activeElement;
+  
+  const modal = document.getElementById('delete-endpoint-modal');
+  const modalContainer = document.getElementById('delete-endpoint-container');
+  
+  // Populate endpoint details
+  document.getElementById('delete-endpoint-name').textContent = endpoint.name || 'Unknown';
+  document.getElementById('delete-endpoint-path').textContent = endpoint.path_prefix || 'unknown';
+  
+  // Show modal
+  modal.classList.remove('hidden');
+  
+  // Trigger animations
+  setTimeout(() => {
+    modal.classList.add('opacity-100');
+    modalContainer.classList.remove('scale-95', 'opacity-0');
+    modalContainer.classList.add('scale-100', 'opacity-100');
+  }, 10);
+  
+  // Set up focus trapping
+  setupDeleteEndpointFocusTrap();
+  
+  // Focus the cancel button initially for safety
+  setTimeout(() => {
+    const cancelButton = modalContainer.querySelector('button[onclick="closeDeleteEndpointModal()"]');
+    if (cancelButton) {
+      cancelButton.focus();
+    }
+  }, 100);
+  
+  // Add event listeners
+  document.addEventListener('keydown', handleDeleteEndpointKeyDown);
+  modal.addEventListener('click', handleDeleteEndpointOverlayClick);
+}
+
+function closeDeleteEndpointModal() {
+  const modal = document.getElementById('delete-endpoint-modal');
+  const modalContainer = document.getElementById('delete-endpoint-container');
+  
+  // Trigger close animations
+  modal.classList.remove('opacity-100');
+  modalContainer.classList.remove('scale-100', 'opacity-100');
+  modalContainer.classList.add('scale-95', 'opacity-0');
+  
+  // Hide modal after animation
+  setTimeout(() => {
+    modal.classList.add('hidden');
+    
+    // Reset state
+    hideDeleteEndpointError();
+    currentDeletingEndpoint = null;
+    
+    // Restore focus
+    if (deleteEndpointLastFocusedElement) {
+      deleteEndpointLastFocusedElement.focus();
+    }
+  }, 300);
+  
+  // Remove event listeners
+  document.removeEventListener('keydown', handleDeleteEndpointKeyDown);
+  modal.removeEventListener('click', handleDeleteEndpointOverlayClick);
+}
+
+function setupDeleteEndpointFocusTrap() {
+  const modal = document.getElementById('delete-endpoint-container');
+  deleteEndpointFocusableElements = modal.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  );
+}
+
+function handleDeleteEndpointKeyDown(event) {
+  if (event.key === 'Escape') {
+    closeDeleteEndpointModal();
+    return;
+  }
+  
+  if (event.key === 'Tab') {
+    trapDeleteEndpointFocus(event);
+  }
+}
+
+function trapDeleteEndpointFocus(event) {
+  const firstFocusable = deleteEndpointFocusableElements[0];
+  const lastFocusable = deleteEndpointFocusableElements[deleteEndpointFocusableElements.length - 1];
+  
+  if (event.shiftKey) {
+    // Shift + Tab
+    if (document.activeElement === firstFocusable) {
+      event.preventDefault();
+      lastFocusable.focus();
+    }
+  } else {
+    // Tab
+    if (document.activeElement === lastFocusable) {
+      event.preventDefault();
+      firstFocusable.focus();
+    }
+  }
+}
+
+function handleDeleteEndpointOverlayClick(event) {
+  if (event.target === event.currentTarget) {
+    closeDeleteEndpointModal();
+  }
+}
+
+function showDeleteEndpointError(message) {
+  const errorContainer = document.getElementById('delete-endpoint-error');
+  const errorMessage = document.getElementById('delete-endpoint-error-message');
+  
+  errorMessage.textContent = message;
+  errorContainer.classList.remove('hidden');
+}
+
+function hideDeleteEndpointError() {
+  const errorContainer = document.getElementById('delete-endpoint-error');
+  errorContainer.classList.add('hidden');
+}
+
+// Handle delete confirmation
+document.getElementById('confirm-delete-endpoint').addEventListener('click', async function() {
+  if (!currentDeletingEndpoint) {
+    console.error('No endpoint to delete');
+    return;
+  }
+  
+  const button = this;
+  const originalText = button.textContent;
+  
+  // Show loading state
+  button.disabled = true;
+  button.textContent = 'Deleting...';
+  
+  try {
+    const response = await fetch(`/api/endpoints/${currentDeletingEndpoint.id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to delete endpoint');
+    }
+    
+    // Success - close modal and reload endpoints
+    closeDeleteEndpointModal();
+    if (typeof loadEndpoints === 'function') {
+      loadEndpoints();
+    }
+    
+  } catch (error) {
+    console.error('Failed to delete endpoint:', error);
+    showDeleteEndpointError(error.message);
+    
+    // Reset button state
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+});
+</script>

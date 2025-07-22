@@ -10,10 +10,14 @@
     </li>
     <li>
       <a href="/admin/models" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "models"}} bg-gray-700{{end}}">
-        Models
+        Models + Endpoints
       </a>
     </li>
-    <!-- <li><a href="#" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Usage & Quota</a></li> -->
+    <li>
+      <a href="/admin/analytics" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "analytics"}} bg-gray-700{{end}}">
+        Analytics
+      </a>
+    </li>
     <li>
       <a href="/admin/test-api" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "test_api"}} bg-gray-700{{end}}">
         Test API

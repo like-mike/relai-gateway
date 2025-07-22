@@ -1,0 +1,2 @@
+# Add this to your go.mod file:
+go get github.com/pkoukk/tiktoken-go

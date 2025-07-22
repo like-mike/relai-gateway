@@ -1,0 +1,350 @@
+<!-- Add Endpoint Modal -->
+<div id="add-endpoint-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden transition-opacity duration-300 ease-out" role="dialog" aria-modal="true" aria-labelledby="add-endpoint-title" aria-describedby="add-endpoint-description">
+  <!-- Modal Container -->
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto transform transition-all duration-300 ease-out scale-95 opacity-0" id="add-endpoint-container">
+    <!-- Modal Header -->
+    <div class="flex items-center justify-between p-6 border-b border-gray-200">
+      <h2 id="add-endpoint-title" class="text-xl font-bold text-gray-900">Add New Endpoint</h2>
+      <button type="button" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-lg p-1" onclick="closeAddEndpointModal()" aria-label="Close modal">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="p-6" id="add-endpoint-description">
+      <form id="add-endpoint-form">
+        <!-- Endpoint Name -->
+        <div class="mb-4">
+          <label for="add-endpoint-name" class="block text-sm font-medium text-gray-700 mb-2">Endpoint Name <span class="text-red-500">*</span></label>
+          <input type="text" id="add-endpoint-name" name="name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" placeholder="Enter endpoint name">
+        </div>
+
+        <!-- Path Prefix -->
+        <div class="mb-4">
+          <label for="add-endpoint-path" class="block text-sm font-medium text-gray-700 mb-2">Path Prefix <span class="text-red-500">*</span></label>
+          <div class="flex items-center">
+            <span class="inline-flex items-center px-3 py-2 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">/api/</span>
+            <input type="text" id="add-endpoint-path" name="path_prefix" required class="flex-1 px-3 py-2 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" placeholder="chat" pattern="[a-zA-Z0-9-_]+" title="Only letters, numbers, hyphens, and underscores allowed">
+          </div>
+          <p class="text-xs text-gray-500 mt-1">This will create the endpoint at /api/your-prefix</p>
+        </div>
+
+        <!-- Description -->
+        <div class="mb-4">
+          <label for="add-endpoint-description-field" class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+          <textarea id="add-endpoint-description-field" name="description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" placeholder="Enter endpoint description"></textarea>
+        </div>
+
+        <!-- Organization -->
+        <div class="mb-4">
+          <label for="add-endpoint-organization" class="block text-sm font-medium text-gray-700 mb-2">Organization <span class="text-red-500">*</span></label>
+          <select id="add-endpoint-organization" name="organization_id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200">
+            <option value="">Select organization</option>
+            <!-- Options will be populated by JavaScript -->
+          </select>
+        </div>
+
+        <!-- Model Configuration -->
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-700 mb-3">Model Configuration</label>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Primary Model -->
+            <div>
+              <label for="add-endpoint-primary-model" class="block text-sm font-medium text-gray-600 mb-2">Primary Model</label>
+              <select id="add-endpoint-primary-model" name="primary_model_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200">
+                <option value="">Select primary model</option>
+                <!-- Options will be populated by JavaScript -->
+              </select>
+            </div>
+
+            <!-- Fallback Model -->
+            <div>
+              <label for="add-endpoint-fallback-model" class="block text-sm font-medium text-gray-600 mb-2">Fallback Model</label>
+              <select id="add-endpoint-fallback-model" name="fallback_model_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200">
+                <option value="">Select fallback model (optional)</option>
+                <!-- Options will be populated by JavaScript -->
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status -->
+        <div class="mb-6">
+          <label class="flex items-center">
+            <input type="checkbox" id="add-endpoint-active" name="is_active" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+            <span class="ml-2 text-sm text-gray-700">Active (enable this endpoint for use)</span>
+          </label>
+        </div>
+
+        <!-- Error Message Container -->
+        <div id="add-endpoint-error" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p class="text-sm text-red-600" id="add-endpoint-error-message"></p>
+        </div>
+      </form>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="flex items-center justify-end space-x-3 p-6 border-t border-gray-200">
+      <button type="button" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2" onclick="closeAddEndpointModal()">Cancel</button>
+      <button type="submit" form="add-endpoint-form" class="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">Add Endpoint</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Add endpoint modal functionality
+let addEndpointLastFocusedElement = null;
+let addEndpointFocusableElements = [];
+let availableModelsForEndpoint = [];
+
+function openAddEndpointModal() {
+  // Store the currently focused element
+  addEndpointLastFocusedElement = document.activeElement;
+  
+  const modal = document.getElementById('add-endpoint-modal');
+  const modalContainer = document.getElementById('add-endpoint-container');
+  
+  // Load organizations and models
+  loadOrganizationsForEndpoint();
+  loadModelsForEndpoint();
+  
+  // Show modal
+  modal.classList.remove('hidden');
+  
+  // Trigger animations
+  setTimeout(() => {
+    modal.classList.add('opacity-100');
+    modalContainer.classList.remove('scale-95', 'opacity-0');
+    modalContainer.classList.add('scale-100', 'opacity-100');
+  }, 10);
+  
+  // Set up focus trapping
+  setupAddEndpointFocusTrap();
+  
+  // Focus the first input
+  setTimeout(() => {
+    document.getElementById('add-endpoint-name').focus();
+  }, 100);
+  
+  // Add event listeners
+  document.addEventListener('keydown', handleAddEndpointKeyDown);
+  modal.addEventListener('click', handleAddEndpointOverlayClick);
+}
+
+function closeAddEndpointModal() {
+  const modal = document.getElementById('add-endpoint-modal');
+  const modalContainer = document.getElementById('add-endpoint-container');
+  
+  // Trigger close animations
+  modal.classList.remove('opacity-100');
+  modalContainer.classList.remove('scale-100', 'opacity-100');
+  modalContainer.classList.add('scale-95', 'opacity-0');
+  
+  // Hide modal after animation
+  setTimeout(() => {
+    modal.classList.add('hidden');
+    
+    // Reset form
+    document.getElementById('add-endpoint-form').reset();
+    hideAddEndpointError();
+    
+    // Restore focus
+    if (addEndpointLastFocusedElement) {
+      addEndpointLastFocusedElement.focus();
+    }
+  }, 300);
+  
+  // Remove event listeners
+  document.removeEventListener('keydown', handleAddEndpointKeyDown);
+  modal.removeEventListener('click', handleAddEndpointOverlayClick);
+}
+
+function setupAddEndpointFocusTrap() {
+  const modal = document.getElementById('add-endpoint-container');
+  addEndpointFocusableElements = modal.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  );
+}
+
+function handleAddEndpointKeyDown(event) {
+  if (event.key === 'Escape') {
+    closeAddEndpointModal();
+    return;
+  }
+  
+  if (event.key === 'Tab') {
+    trapAddEndpointFocus(event);
+  }
+}
+
+function trapAddEndpointFocus(event) {
+  const firstFocusable = addEndpointFocusableElements[0];
+  const lastFocusable = addEndpointFocusableElements[addEndpointFocusableElements.length - 1];
+  
+  if (event.shiftKey) {
+    // Shift + Tab
+    if (document.activeElement === firstFocusable) {
+      event.preventDefault();
+      lastFocusable.focus();
+    }
+  } else {
+    // Tab
+    if (document.activeElement === lastFocusable) {
+      event.preventDefault();
+      firstFocusable.focus();
+    }
+  }
+}
+
+function handleAddEndpointOverlayClick(event) {
+  if (event.target === event.currentTarget) {
+    closeAddEndpointModal();
+  }
+}
+
+async function loadOrganizationsForEndpoint() {
+  try {
+    const response = await fetch('/api/organizations', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const organizations = data.organizations || [];
+    
+    const orgSelect = document.getElementById('add-endpoint-organization');
+    // Clear existing options except the first one
+    while (orgSelect.children.length > 1) {
+      orgSelect.removeChild(orgSelect.lastChild);
+    }
+    
+    organizations.forEach(org => {
+      const option = document.createElement('option');
+      option.value = org.id;
+      option.textContent = org.name;
+      orgSelect.appendChild(option);
+    });
+
+  } catch (error) {
+    console.error('Failed to load organizations:', error);
+  }
+}
+
+async function loadModelsForEndpoint() {
+  try {
+    const response = await fetch('/api/models', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    availableModelsForEndpoint = data.models || [];
+    
+    const primarySelect = document.getElementById('add-endpoint-primary-model');
+    const fallbackSelect = document.getElementById('add-endpoint-fallback-model');
+    
+    // Clear existing options except the first one
+    while (primarySelect.children.length > 1) {
+      primarySelect.removeChild(primarySelect.lastChild);
+    }
+    while (fallbackSelect.children.length > 1) {
+      fallbackSelect.removeChild(fallbackSelect.lastChild);
+    }
+    
+    availableModelsForEndpoint.forEach(model => {
+      if (model.active) {
+        const primaryOption = document.createElement('option');
+        primaryOption.value = model.id;
+        primaryOption.textContent = `${model.name} (${model.provider})`;
+        primarySelect.appendChild(primaryOption);
+        
+        const fallbackOption = document.createElement('option');
+        fallbackOption.value = model.id;
+        fallbackOption.textContent = `${model.name} (${model.provider})`;
+        fallbackSelect.appendChild(fallbackOption);
+      }
+    });
+
+  } catch (error) {
+    console.error('Failed to load models:', error);
+  }
+}
+
+function showAddEndpointError(message) {
+  const errorContainer = document.getElementById('add-endpoint-error');
+  const errorMessage = document.getElementById('add-endpoint-error-message');
+  
+  errorMessage.textContent = message;
+  errorContainer.classList.remove('hidden');
+}
+
+function hideAddEndpointError() {
+  const errorContainer = document.getElementById('add-endpoint-error');
+  errorContainer.classList.add('hidden');
+}
+
+// Handle form submission
+document.getElementById('add-endpoint-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const formData = new FormData(this);
+  const data = {};
+  
+  // Convert form data to object
+  for (let [key, value] of formData.entries()) {
+    if (value) {
+      data[key] = value;
+    }
+  }
+  
+  // Convert boolean values
+  data.is_active = document.getElementById('add-endpoint-active').checked;
+  
+  // Remove empty values for optional fields
+  if (!data.primary_model_id) delete data.primary_model_id;
+  if (!data.fallback_model_id) delete data.fallback_model_id;
+  if (!data.description) delete data.description;
+  
+  try {
+    const response = await fetch('/api/endpoints', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create endpoint');
+    }
+    
+    // Success - close modal and reload endpoints
+    closeAddEndpointModal();
+    if (typeof loadEndpoints === 'function') {
+      loadEndpoints();
+    }
+    
+  } catch (error) {
+    console.error('Failed to create endpoint:', error);
+    showAddEndpointError(error.message);
+  }
+});
+</script>

@@ -4,3 +4,4 @@ infra/
 data/
 tmp/
 .idea/
+config.yml

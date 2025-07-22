@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/like-mike/relai-gateway/shared/config"
 	"github.com/like-mike/relai-gateway/shared/db"
 	"github.com/like-mike/relai-gateway/shared/middleware"
 	uimw "github.com/like-mike/relai-gateway/ui/middleware"
@@ -17,7 +18,13 @@ import (
 func main() {
 	// Load environment variables
 	_ = godotenv.Load("../.env")
-	config := admin.LoadAuthConfig()
+	authConfig := admin.LoadAuthConfig()
+
+	// Load theme configuration
+	_, err := config.LoadConfig("../config.yml")
+	if err != nil {
+		log.Printf("Warning: Failed to load theme config: %v", err)
+	}
 
 	// Initialize DB
 	conn, err := db.InitDB()
@@ -37,8 +44,10 @@ func main() {
 		"templates/pages/auth/login.html",
 		"templates/pages/admin/api-keys.html",
 		"templates/pages/admin/models.html",
+		"templates/pages/admin/analytics.html",
 		"templates/pages/admin/test-api.html",
 		"templates/pages/admin/settings.html",
+		"templates/pages/admin/docs.html",
 		"templates/components/ui/banner.html",
 		"templates/components/ui/sidebar.html",
 		"templates/components/ui/user-dropdown.html",
@@ -53,8 +62,12 @@ func main() {
 		"templates/components/modals/models/edit-model-modal.html",
 		"templates/components/modals/models/delete-model-modal.html",
 		"templates/components/modals/models/manage-access-modal.html",
+		"templates/components/modals/endpoints/add-endpoint-modal.html",
+		"templates/components/modals/endpoints/edit-endpoint-modal.html",
+		"templates/components/modals/endpoints/delete-endpoint-modal.html",
 		"templates/components/modals/organizations/create-org-modal.html",
 		"templates/components/modals/organizations/edit-org-modal.html",
+		"templates/shared/theme.css",
 	}
 	r.LoadHTMLFiles(templateFiles...)
 
@@ -64,8 +77,18 @@ func main() {
 	// Health check
 	r.GET("/health", health.Handler)
 
+	// Dynamic theme CSS endpoint
+	r.GET("/theme.css", func(c *gin.Context) {
+		userData := admin.GetUserContext(c)
+		c.Header("Content-Type", "text/css")
+		c.HTML(http.StatusOK, "theme.css", userData)
+	})
+
+	// Serve docs directory files publicly (for Swagger UI to fetch)
+	r.Static("/docs", "../docs")
+
 	// Register public authentication routes
-	admin.RegisterPublicAuthRoutes(r, config)
+	admin.RegisterPublicAuthRoutes(r, authConfig)
 
 	// Root route redirect
 	r.GET("/", func(c *gin.Context) {
@@ -75,7 +98,7 @@ func main() {
 	// Protected routes
 	authorized := r.Group("/")
 	authorized.Use(uimw.AuthMiddlewareGin())
-	admin.RegisterAuthRoutes(authorized, config)
+	admin.RegisterAuthRoutes(authorized, authConfig)
 
 	// Admin dashboard - API Keys page
 	authorized.GET("/admin", admin.DashboardHandler)
@@ -92,6 +115,18 @@ func main() {
 		c.HTML(http.StatusOK, "test-api.html", userData)
 	})
 	authorized.GET("/admin/settings", admin.SettingsHandler)
+	authorized.GET("/admin/analytics", func(c *gin.Context) {
+		userData := admin.GetUserContext(c)
+		userData["activePage"] = "analytics"
+		userData["title"] = "Usage Analytics"
+		c.HTML(http.StatusOK, "analytics.html", userData)
+	})
+	authorized.GET("/admin/docs", func(c *gin.Context) {
+		userData := admin.GetUserContext(c)
+		userData["activePage"] = "docs"
+		userData["title"] = "API Documentation"
+		c.HTML(http.StatusOK, "docs.html", userData)
+	})
 
 	// API endpoints with database integration
 	authorized.GET("/quota", admin.GetQuotaHandler)
@@ -101,8 +136,17 @@ func main() {
 	authorized.GET("/api/organizations", admin.OrganizationsHandler)
 	authorized.GET("/api/models", admin.ModelsHandler)
 	authorized.POST("/api/models", admin.CreateModelHandler)
+	authorized.PUT("/api/models/:id", admin.UpdateModelHandler)
 	authorized.DELETE("/api/models/:id", admin.DeleteModelHandler)
 	authorized.POST("/api/models/:id/access", admin.ManageModelAccessHandler)
+	authorized.GET("/api/analytics/dashboard", admin.AnalyticsDashboardHandler)
+
+	// Endpoints API routes
+	authorized.GET("/api/endpoints", admin.EndpointsHandler)
+	authorized.POST("/api/endpoints", admin.CreateEndpointHandler)
+	authorized.GET("/api/endpoints/:id", admin.GetEndpointHandler)
+	authorized.PUT("/api/endpoints/:id", admin.UpdateEndpointHandler)
+	authorized.DELETE("/api/endpoints/:id", admin.DeleteEndpointHandler)
 
 	// Settings endpoints
 	authorized.GET("/admin/settings/organizations", admin.OrganizationsTableHandler)

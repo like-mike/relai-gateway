@@ -21,17 +21,6 @@ type QuotaStats struct {
 	PercentUsed    string `json:"percent_used"`
 }
 
-type UsageLog struct {
-	ID               string    `json:"id" db:"id"`
-	APIKeyID         string    `json:"api_key_id" db:"api_key_id"`
-	OrganizationID   string    `json:"organization_id" db:"organization_id"`
-	ModelID          string    `json:"model_id" db:"model_id"`
-	TokensUsed       int       `json:"tokens_used" db:"tokens_used"`
-	RequestTimestamp time.Time `json:"request_timestamp" db:"request_timestamp"`
-	ResponseStatus   *int      `json:"response_status" db:"response_status"`
-	DurationMs       *int      `json:"duration_ms" db:"duration_ms"`
-}
-
 // CalculateQuotaStats calculates the quota statistics for display
 func (q *OrganizationQuota) CalculateQuotaStats() QuotaStats {
 	remaining := q.TotalQuota - q.UsedTokens

@@ -1,0 +1,791 @@
+openapi: 3.0.3
+info:
+  title: RelAI Gateway API
+  description: |
+    RelAI Gateway provides a unified interface for accessing multiple AI providers through OpenAI-compatible endpoints.
+    
+    ## Authentication
+    All API endpoints (except `/health` and public model listings) require authentication via API key.
+    
+    ## Organization-Based Access
+    Each API key belongs to an organization and only has access to models that the organization has been granted permission to use.
+    
+    ## Custom Endpoints
+    Organizations can create custom endpoints with specific model configurations for tailored API access.
+  version: 1.0.0
+  contact:
+    name: RelAI Gateway
+    url: https://github.com/like-mike/relai-gateway
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8081
+    description: Development server
+  - url: https://api.yourdomain.com
+    description: Production server
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health Check
+      description: Returns the health status of the gateway
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /v1/models:
+    get:
+      summary: List Models
+      description: |
+        Returns a list of available models. 
+        - With API key: Returns only models the organization has access to
+        - Without API key: Returns all available models for discovery
+      tags:
+        - Models
+      security:
+        - ApiKeyAuth: []
+        - {}
+      responses:
+        '200':
+          description: List of available models
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelsList'
+
+  /models:
+    get:
+      summary: List Models (Alternative Endpoint)
+      description: Alternative endpoint for listing models with same behavior as /v1/models
+      tags:
+        - Models
+      security:
+        - ApiKeyAuth: []
+        - {}
+      responses:
+        '200':
+          description: List of available models
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelsList'
+
+  /v1/chat/completions:
+    post:
+      summary: Create Chat Completion
+      description: Creates a completion for the chat message
+      tags:
+        - Chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatCompletionRequest'
+            examples:
+              simple_chat:
+                summary: Simple chat message
+                value:
+                  model: "gpt-3.5-turbo"
+                  messages:
+                    - role: "user"
+                      content: "Hello, how are you?"
+              chat_with_system:
+                summary: Chat with system message
+                value:
+                  model: "gpt-4"
+                  messages:
+                    - role: "system"
+                      content: "You are a helpful assistant."
+                    - role: "user"
+                      content: "Explain quantum computing"
+                  max_tokens: 150
+                  temperature: 0.7
+      responses:
+        '200':
+          description: Chat completion response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatCompletionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/completions:
+    post:
+      summary: Create Completion
+      description: Creates a completion for the provided prompt and parameters
+      tags:
+        - Completions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompletionRequest'
+            examples:
+              simple_completion:
+                summary: Simple text completion
+                value:
+                  model: "gpt-3.5-turbo"
+                  prompt: "The future of AI is"
+                  max_tokens: 50
+                  temperature: 0.5
+      responses:
+        '200':
+          description: Completion response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompletionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/embeddings:
+    post:
+      summary: Create Embeddings
+      description: Get a vector representation of a given input
+      tags:
+        - Embeddings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbeddingRequest'
+            examples:
+              text_embedding:
+                summary: Text embedding
+                value:
+                  model: "text-embedding-ada-002"
+                  input: "The quick brown fox jumps over the lazy dog"
+      responses:
+        '200':
+          description: Embedding response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/moderations:
+    post:
+      summary: Create Moderation
+      description: Classifies if text violates OpenAI's Usage Policies
+      tags:
+        - Moderations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerationRequest'
+            examples:
+              text_moderation:
+                summary: Text moderation
+                value:
+                  input: "I want to hurt someone"
+      responses:
+        '200':
+          description: Moderation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModerationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/images/generations:
+    post:
+      summary: Create Image
+      description: Creates an image given a text prompt
+      tags:
+        - Images
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImageGenerationRequest'
+            examples:
+              simple_image:
+                summary: Simple image generation
+                value:
+                  prompt: "A futuristic city at sunset"
+                  n: 1
+                  size: "1024x1024"
+      responses:
+        '200':
+          description: Image generation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageGenerationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/audio/transcriptions:
+    post:
+      summary: Create Transcription
+      description: Transcribes audio into the input language
+      tags:
+        - Audio
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - model
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file to transcribe
+                model:
+                  type: string
+                  example: "whisper-1"
+                language:
+                  type: string
+                  description: ISO-639-1 language code
+                  example: "en"
+                response_format:
+                  type: string
+                  enum: [json, text, srt, verbose_json, vtt]
+                  default: json
+      responses:
+        '200':
+          description: Transcription response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscriptionResponse'
+
+  /v1/audio/translations:
+    post:
+      summary: Create Translation
+      description: Translates audio into English
+      tags:
+        - Audio
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - model
+              properties:
+                file:
+                  type: string
+                  format: binary
+                model:
+                  type: string
+                  example: "whisper-1"
+                response_format:
+                  type: string
+                  enum: [json, text, srt, verbose_json, vtt]
+                  default: json
+      responses:
+        '200':
+          description: Translation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscriptionResponse'
+
+  /api/{custom_endpoint}:
+    post:
+      summary: Custom Endpoint
+      description: |
+        Organization-specific custom endpoints with predefined model configurations.
+        Replace `{custom_endpoint}` with your organization's custom endpoint name.
+        
+        Examples:
+        - `/api/chat` - Custom chat endpoint
+        - `/api/assistant` - Custom assistant endpoint
+        - `/api/support-bot` - Custom support bot endpoint
+      tags:
+        - Custom Endpoints
+      parameters:
+        - in: path
+          name: custom_endpoint
+          required: true
+          schema:
+            type: string
+          description: The custom endpoint name configured for your organization
+          example: "chat"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/ChatCompletionRequest'
+                - $ref: '#/components/schemas/CompletionRequest'
+            examples:
+              custom_chat:
+                summary: Custom chat endpoint
+                value:
+                  model: "gpt-3.5-turbo"
+                  messages:
+                    - role: "user"
+                      content: "Hello from custom endpoint"
+      responses:
+        '200':
+          description: Response from custom endpoint
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ChatCompletionResponse'
+                  - $ref: '#/components/schemas/CompletionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Custom endpoint not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: |
+        API key authentication. Provide your API key in the Authorization header:
+        `Authorization: Bearer sk-your-api-key-here`
+
+  responses:
+    Unauthorized:
+      description: Authentication required or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Invalid API key"
+    
+    Forbidden:
+      description: Access denied - organization doesn't have access to this model
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Organization does not have access to this model"
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code
+        details:
+          type: object
+          description: Additional error details
+
+    ModelsList:
+      type: object
+      properties:
+        object:
+          type: string
+          example: "list"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Model'
+
+    Model:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "gpt-3.5-turbo"
+        object:
+          type: string
+          example: "model"
+        created:
+          type: integer
+          format: int64
+          example: 1677657600
+        owned_by:
+          type: string
+          example: "openai"
+
+    ChatCompletionRequest:
+      type: object
+      required:
+        - model
+        - messages
+      properties:
+        model:
+          type: string
+          description: ID of the model to use
+          example: "gpt-3.5-turbo"
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+        max_tokens:
+          type: integer
+          minimum: 1
+          description: Maximum number of tokens to generate
+          example: 150
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          description: Sampling temperature
+          example: 0.7
+        top_p:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Nucleus sampling parameter
+          example: 1
+        stream:
+          type: boolean
+          description: Whether to stream back partial progress
+          default: false
+        stop:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          description: Sequences where the API will stop generating tokens
+        presence_penalty:
+          type: number
+          minimum: -2
+          maximum: 2
+          description: Penalty for new tokens based on presence
+          example: 0
+        frequency_penalty:
+          type: number
+          minimum: -2
+          maximum: 2
+          description: Penalty for new tokens based on frequency
+          example: 0
+
+    ChatMessage:
+      type: object
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant]
+          description: Role of the message author
+        content:
+          type: string
+          description: Content of the message
+        name:
+          type: string
+          description: Name of the author of this message
+
+    ChatCompletionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "chatcmpl-123"
+        object:
+          type: string
+          example: "chat.completion"
+        created:
+          type: integer
+          format: int64
+        model:
+          type: string
+          example: "gpt-3.5-turbo"
+        choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatChoice'
+        usage:
+          $ref: '#/components/schemas/Usage'
+
+    ChatChoice:
+      type: object
+      properties:
+        index:
+          type: integer
+        message:
+          $ref: '#/components/schemas/ChatMessage'
+        finish_reason:
+          type: string
+          enum: [stop, length, content_filter]
+
+    CompletionRequest:
+      type: object
+      required:
+        - model
+        - prompt
+      properties:
+        model:
+          type: string
+          example: "gpt-3.5-turbo"
+        prompt:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          description: The prompt(s) to generate completions for
+        max_tokens:
+          type: integer
+          minimum: 1
+          example: 50
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          example: 0.5
+        top_p:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 1
+        n:
+          type: integer
+          minimum: 1
+          description: Number of completions to generate
+          example: 1
+        stream:
+          type: boolean
+          default: false
+        stop:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+
+    CompletionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          example: "text_completion"
+        created:
+          type: integer
+          format: int64
+        model:
+          type: string
+        choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompletionChoice'
+        usage:
+          $ref: '#/components/schemas/Usage'
+
+    CompletionChoice:
+      type: object
+      properties:
+        text:
+          type: string
+        index:
+          type: integer
+        finish_reason:
+          type: string
+
+    EmbeddingRequest:
+      type: object
+      required:
+        - model
+        - input
+      properties:
+        model:
+          type: string
+          example: "text-embedding-ada-002"
+        input:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          description: Input text to get embeddings for
+
+    EmbeddingResponse:
+      type: object
+      properties:
+        object:
+          type: string
+          example: "list"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Embedding'
+        model:
+          type: string
+        usage:
+          $ref: '#/components/schemas/Usage'
+
+    Embedding:
+      type: object
+      properties:
+        object:
+          type: string
+          example: "embedding"
+        embedding:
+          type: array
+          items:
+            type: number
+        index:
+          type: integer
+
+    ModerationRequest:
+      type: object
+      required:
+        - input
+      properties:
+        input:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          description: Input text to classify
+
+    ModerationResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        model:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModerationResult'
+
+    ModerationResult:
+      type: object
+      properties:
+        flagged:
+          type: boolean
+        categories:
+          type: object
+          additionalProperties:
+            type: boolean
+        category_scores:
+          type: object
+          additionalProperties:
+            type: number
+
+    ImageGenerationRequest:
+      type: object
+      required:
+        - prompt
+      properties:
+        prompt:
+          type: string
+          description: Text description of the desired image
+        n:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+        size:
+          type: string
+          enum: ["256x256", "512x512", "1024x1024"]
+          default: "1024x1024"
+        response_format:
+          type: string
+          enum: [url, b64_json]
+          default: url
+
+    ImageGenerationResponse:
+      type: object
+      properties:
+        created:
+          type: integer
+          format: int64
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageData'
+
+    ImageData:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          description: URL of the generated image
+        b64_json:
+          type: string
+          description: Base64-encoded image data
+
+    TranscriptionResponse:
+      type: object
+      properties:
+        text:
+          type: string
+          description: The transcribed text
+
+    Usage:
+      type: object
+      properties:
+        prompt_tokens:
+          type: integer
+        completion_tokens:
+          type: integer
+        total_tokens:
+          type: integer
+
+tags:
+  - name: System
+    description: System health and status endpoints
+  - name: Models
+    description: Model listing and information
+  - name: Chat
+    description: Chat completion endpoints
+  - name: Completions
+    description: Text completion endpoints
+  - name: Embeddings
+    description: Text embedding endpoints
+  - name: Moderations
+    description: Content moderation endpoints
+  - name: Images
+    description: Image generation endpoints
+  - name: Audio
+    description: Audio transcription and translation endpoints
+  - name: Custom Endpoints
+    description: Organization-specific custom endpoints

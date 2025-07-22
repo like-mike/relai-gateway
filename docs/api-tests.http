@@ -1,0 +1,250 @@
+### RelAI Gateway API Test Collection
+### Use with REST Client extension in VSCode or any HTTP client
+
+# Replace with your actual API key
+@apiKey = sk-c145fad9c61c729b46357481e31b2fa524ec52737f73bcfd86dd3fdb7309bf29
+@baseUrl = http://localhost:8081
+
+### Health Check (No Auth Required)
+GET {{baseUrl}}/health
+
+### List Models (No Auth - Returns All Models)
+GET {{baseUrl}}/v1/models
+
+### List Models (Alternative Endpoint)
+GET {{baseUrl}}/models
+
+### List Models (With Auth - Returns Organization's Models Only)
+GET {{baseUrl}}/v1/models
+Authorization: Bearer {{apiKey}}
+
+### Chat Completion - Simple
+POST {{baseUrl}}/v1/chat/completions
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "model": "gpt-3.5-turbo",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello, how are you?"
+    }
+  ],
+  "max_tokens": 150,
+  "temperature": 0.7
+}
+
+### Chat Completion - With System Message
+POST {{baseUrl}}/v1/chat/completions
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "model": "gpt-4",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant that responds in a professional manner."
+    },
+    {
+      "role": "user",
+      "content": "Explain quantum computing in simple terms."
+    }
+  ],
+  "max_tokens": 200,
+  "temperature": 0.5
+}
+
+### Chat Completion - Streaming
+POST {{baseUrl}}/v1/chat/completions
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "model": "gpt-3.5-turbo",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Write a short story about a robot."
+    }
+  ],
+  "max_tokens": 300,
+  "temperature": 0.8,
+  "stream": true
+}
+
+### Text Completion
+POST {{baseUrl}}/v1/completions
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "model": "gpt-3.5-turbo",
+  "prompt": "The future of artificial intelligence is",
+  "max_tokens": 100,
+  "temperature": 0.7
+}
+
+### Text Embeddings
+POST {{baseUrl}}/v1/embeddings
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "model": "text-embedding-ada-002",
+  "input": "The quick brown fox jumps over the lazy dog"
+}
+
+### Content Moderation
+POST {{baseUrl}}/v1/moderations
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "input": "I want to hurt someone"
+}
+
+### Image Generation
+POST {{baseUrl}}/v1/images/generations
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "prompt": "A futuristic city at sunset with flying cars",
+  "n": 1,
+  "size": "1024x1024",
+  "response_format": "url"
+}
+
+### Custom Endpoint - Chat (Replace 'chat' with your custom endpoint)
+POST {{baseUrl}}/api/chat
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "model": "gpt-3.5-turbo",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello from custom endpoint!"
+    }
+  ],
+  "max_tokens": 100
+}
+
+### Custom Endpoint - Assistant (Replace 'assistant' with your custom endpoint)
+POST {{baseUrl}}/api/assistant
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "model": "gpt-4",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a technical assistant."
+    },
+    {
+      "role": "user",
+      "content": "How do I optimize database queries?"
+    }
+  ],
+  "max_tokens": 250,
+  "temperature": 0.3
+}
+
+### Error Test - Invalid API Key
+GET {{baseUrl}}/v1/models
+Authorization: Bearer sk-invalid-key
+
+### Error Test - Missing API Key for Protected Endpoint
+POST {{baseUrl}}/v1/chat/completions
+Content-Type: application/json
+
+{
+  "model": "gpt-3.5-turbo",
+  "messages": [
+    {
+      "role": "user",
+      "content": "This should fail"
+    }
+  ]
+}
+
+### Error Test - Nonexistent Custom Endpoint
+POST {{baseUrl}}/api/nonexistent-endpoint
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "model": "gpt-3.5-turbo",
+  "messages": [
+    {
+      "role": "user",
+      "content": "This endpoint doesn't exist"
+    }
+  ]
+}
+
+### Test Model Access Control
+# This tests that the API key only returns models the organization has access to
+GET {{baseUrl}}/v1/models
+Authorization: Bearer {{apiKey}}
+
+### Audio Transcription (Example - requires actual audio file)
+# POST {{baseUrl}}/v1/audio/transcriptions
+# Authorization: Bearer {{apiKey}}
+# Content-Type: multipart/form-data
+# 
+# file=@path/to/audio.mp3
+# model=whisper-1
+# language=en
+
+### Audio Translation (Example - requires actual audio file)
+# POST {{baseUrl}}/v1/audio/translations
+# Authorization: Bearer {{apiKey}}
+# Content-Type: multipart/form-data
+# 
+# file=@path/to/audio.mp3
+# model=whisper-1
+
+### Performance Test - Multiple Requests
+### You can duplicate this request to test load handling
+POST {{baseUrl}}/v1/chat/completions
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "model": "gpt-3.5-turbo",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is 2+2?"
+    }
+  ],
+  "max_tokens": 10
+}
+
+### Organization Model Access Test
+### This should return different results for different API keys
+### depending on which models their organization has access to
+GET {{baseUrl}}/v1/models
+Authorization: Bearer {{apiKey}}
+
+### Test Custom Endpoint with Fallback Model
+### If primary model fails, should fallback to secondary model
+POST {{baseUrl}}/api/chat
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "model": "unavailable-model",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Test fallback model functionality"
+    }
+  ],
+  "max_tokens": 50
+}

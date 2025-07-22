@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Documentation - RelAI Gateway</title>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.10.5/swagger-ui.css" />
+    <style>
+        html {
+            box-sizing: border-box;
+            overflow: -moz-scrollbars-vertical;
+            overflow-y: scroll;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+        body {
+            margin: 0;
+            background: #fafafa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        
+        .swagger-ui .topbar {
+            background-color: #1f2937;
+            padding: 16px 0;
+        }
+        
+        .swagger-ui .topbar .download-url-wrapper {
+            display: none;
+        }
+        
+        .custom-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .custom-header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 300;
+        }
+        
+        .custom-header p {
+            margin: 0.5rem 0 0 0;
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .back-link {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            background: #4f46e5;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            text-decoration: none;
+            font-weight: 500;
+            z-index: 9999;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.2s;
+        }
+        
+        .back-link:hover {
+            background: #4338ca;
+            color: white;
+            text-decoration: none;
+        }
+        
+        .info-section {
+            max-width: 1200px;
+            margin: 0 auto 2rem auto;
+            padding: 0 2rem;
+        }
+        
+        .info-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .info-card {
+            background: white;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #4f46e5;
+        }
+        
+        .info-card h3 {
+            margin: 0 0 1rem 0;
+            color: #1f2937;
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+        
+        .info-card p {
+            margin: 0;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+        
+        .info-card code {
+            background: #f3f4f6;
+            padding: 0.125rem 0.25rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+        }
+        
+        #swagger-ui {
+            max-width: none;
+        }
+    </style>
+</head>
+<body>
+    <a href="/admin" class="back-link">← Back to Admin</a>
+    
+    <div class="custom-header">
+        <h1>RelAI Gateway API Documentation</h1>
+        <p>Complete API reference with interactive testing</p>
+    </div>
+    
+    <div class="info-section">
+        <div class="info-cards">
+            <div class="info-card">
+                <h3>🔐 Authentication</h3>
+                <p>All API endpoints require authentication via API key. Get your API key from the <a href="/admin">Admin Dashboard</a> and use it in the Authorization header:</p>
+                <p><code>Authorization: Bearer sk-your-api-key</code></p>
+            </div>
+            
+            <div class="info-card">
+                <h3>🌐 Base URLs</h3>
+                <p><strong>Development:</strong> <code>http://localhost:8081</code></p>
+                <p><strong>Production:</strong> <code>https://api.yourdomain.com</code></p>
+            </div>
+            
+            <div class="info-card">
+                <h3>🏢 Organization Access</h3>
+                <p>Each API key belongs to an organization and only provides access to models that the organization has been granted permission to use.</p>
+            </div>
+            
+            <div class="info-card">
+                <h3>🔗 Custom Endpoints</h3>
+                <p>Organizations can create custom endpoints like <code>/api/chat</code> or <code>/api/assistant</code> with predefined model configurations.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="swagger-ui"></div>
+
+    <script src="https://unpkg.com/swagger-ui-dist@5.10.5/swagger-ui-bundle.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5.10.5/swagger-ui-standalone-preset.js"></script>
+    <script>
+        window.onload = function() {
+            const ui = SwaggerUIBundle({
+                url: '/docs/swagger.yaml',
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout",
+                defaultModelsExpandDepth: 1,
+                defaultModelExpandDepth: 1,
+                defaultModelRendering: 'example',
+                displayOperationId: false,
+                tryItOutEnabled: true,
+                filter: true,
+                supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
+                onComplete: function() {
+                    // Add some custom styling
+                    const style = document.createElement('style');
+                    style.textContent = `
+                        .swagger-ui .info .title {
+                            display: none;
+                        }
+                        .swagger-ui .info .description {
+                            margin-top: 0;
+                        }
+                        .swagger-ui .scheme-container {
+                            background: #f8f9fa;
+                            padding: 1rem;
+                            border-radius: 0.5rem;
+                            margin-bottom: 1rem;
+                        }
+                    `;
+                    document.head.appendChild(style);
+                },
+                requestInterceptor: function(request) {
+                    // Only modify API requests, not swagger spec requests
+                    if (request.url.includes('/docs/swagger.yaml')) {
+                        // Let swagger.yaml load from the current UI host
+                        return request;
+                    }
+                    
+                    // Auto-add the gateway URL for API requests
+                    if (request.url.startsWith('/v1/') || request.url.startsWith('/api/')) {
+                        const gatewayUrl = 'http://localhost:8081';
+                        request.url = gatewayUrl + request.url;
+                    }
+                    return request;
+                }
+            });
+
+            window.ui = ui;
+        };
+    </script>
+</body>
+</html>

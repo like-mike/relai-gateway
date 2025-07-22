@@ -367,7 +367,7 @@ async function saveAccessChanges() {
   
   try {
     const response = await fetch(`/api/models/${currentManageModel.id}/access`, {
-      method: 'PUT',
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },

@@ -3,9 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>API Keys - RelAI Gateway</title>
+  <title>API Keys - {{if .Config}}{{.Config.App.Name}}{{else}}RelAI Gateway{{end}}</title>
   <script src="https://unpkg.com/htmx.org@1.9.5"></script>
   <link href="https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  
+  <!-- Dynamic Theme CSS -->
+  <link href="/theme.css" rel="stylesheet">
 </head>
 <body class="h-full text-gray-900">
   <!-- Banner/Header -->

@@ -1,84 +1,47 @@
 package provider
 
 import (
-	"os"
-
-	"github.com/joho/godotenv"
+	"github.com/like-mike/relai-gateway/shared/models"
 )
 
-type Model struct {
-	ID        string `json:"id"`
-	Object    string `json:"object"`
-	Created   int64  `json:"created"`
-	OwnedBy   string `json:"owned_by"`
-	SecretKey string
-}
-
-type ModelList struct {
-	Object string  `json:"object"`
-	Data   []Model `json:"data"`
-}
-
-var MODELS ModelList
-
-var ModelMap map[string]Model
-
+// ProxyConfig holds configuration for making requests to AI providers
 type ProxyConfig struct {
-	BaseURL string
-	Name    string
+	BaseURL  string
+	Name     string
+	APIToken string
+	ModelID  string
 }
 
-func init() {
-
-	//temp
-	_ = godotenv.Load()
-
-	ModelMap = make(map[string]Model)
-	MODELS = ModelList{
-		Object: "list",
-		Data: []Model{
-			{
-				ID:        "gpt-3.5-turbo",
-				Object:    "model",
-				Created:   1677657600,
-				OwnedBy:   "openai",
-				SecretKey: os.Getenv("LLM_API_KEY"),
-			},
-			{
-				ID:        "gpt-4.1",
-				Object:    "model",
-				Created:   1677657600,
-				OwnedBy:   "openai",
-				SecretKey: os.Getenv("LLM_API_KEY"),
-			},
-		},
+// CreateProxyConfigFromModel creates a ProxyConfig from a database model
+func CreateProxyConfigFromModel(model *models.Model) *ProxyConfig {
+	if model == nil {
+		return getDefaultConfig()
 	}
 
-	for _, model := range MODELS.Data {
-		ModelMap[model.ID] = model
+	baseURL := "https://api.openai.com" // default
+	if model.APIEndpoint != nil && *model.APIEndpoint != "" {
+		baseURL = *model.APIEndpoint
+	}
+
+	apiToken := ""
+	if model.APIToken != nil {
+		apiToken = *model.APIToken
+	}
+
+	return &ProxyConfig{
+		BaseURL:  baseURL,
+		Name:     model.Provider,
+		APIToken: apiToken,
+		ModelID:  model.ModelID,
 	}
 }
 
-func NewProxyConfigFromEnv(providerOverride string) *ProxyConfig {
-	provider := providerOverride
-	if provider == "" {
-		provider = os.Getenv("LLM_PROVIDER")
-	}
-	switch provider {
-	case "aws":
-		return &ProxyConfig{
-			BaseURL: "https://api.aws.com",
-			Name:    "AWS",
-		}
-	case "ollama":
-		return &ProxyConfig{
-			BaseURL: "http://localhost:11434",
-			Name:    "Ollama",
-		}
-	default: // openai
-		return &ProxyConfig{
-			BaseURL: "https://api.openai.com",
-			Name:    "OpenAI",
-		}
+// getDefaultConfig provides a fallback configuration
+func getDefaultConfig() *ProxyConfig {
+	return &ProxyConfig{
+		BaseURL:  "https://api.openai.com",
+		Name:     "openai",
+		APIToken: "",
+		ModelID:  "gpt-3.5-turbo",
 	}
 }

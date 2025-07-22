@@ -1,0 +1,322 @@
+<!-- Edit Endpoint Modal -->
+<div id="edit-endpoint-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden transition-opacity duration-300 ease-out" role="dialog" aria-modal="true" aria-labelledby="edit-endpoint-title" aria-describedby="edit-endpoint-description">
+  <!-- Modal Container -->
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto transform transition-all duration-300 ease-out scale-95 opacity-0" id="edit-endpoint-container">
+    <!-- Modal Header -->
+    <div class="flex items-center justify-between p-6 border-b border-gray-200">
+      <h2 id="edit-endpoint-title" class="text-xl font-bold text-gray-900">Edit Endpoint</h2>
+      <button type="button" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-lg p-1" onclick="closeEditEndpointModal()" aria-label="Close modal">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="p-6" id="edit-endpoint-description">
+      <form id="edit-endpoint-form">
+        <input type="hidden" id="edit-endpoint-id" name="id">
+        
+        <!-- Endpoint Name -->
+        <div class="mb-4">
+          <label for="edit-endpoint-name" class="block text-sm font-medium text-gray-700 mb-2">Endpoint Name <span class="text-red-500">*</span></label>
+          <input type="text" id="edit-endpoint-name" name="name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" placeholder="Enter endpoint name">
+        </div>
+
+        <!-- Path Prefix -->
+        <div class="mb-4">
+          <label for="edit-endpoint-path" class="block text-sm font-medium text-gray-700 mb-2">Path Prefix <span class="text-red-500">*</span></label>
+          <div class="flex items-center">
+            <span class="inline-flex items-center px-3 py-2 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">/api/</span>
+            <input type="text" id="edit-endpoint-path" name="path_prefix" required class="flex-1 px-3 py-2 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" placeholder="chat" pattern="[a-zA-Z0-9-_]+" title="Only letters, numbers, hyphens, and underscores allowed">
+          </div>
+          <p class="text-xs text-gray-500 mt-1">This will create the endpoint at /api/your-prefix</p>
+        </div>
+
+        <!-- Description -->
+        <div class="mb-4">
+          <label for="edit-endpoint-description-field" class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+          <textarea id="edit-endpoint-description-field" name="description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" placeholder="Enter endpoint description"></textarea>
+        </div>
+
+        <!-- Model Configuration -->
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-700 mb-3">Model Configuration</label>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Primary Model -->
+            <div>
+              <label for="edit-endpoint-primary-model" class="block text-sm font-medium text-gray-600 mb-2">Primary Model</label>
+              <select id="edit-endpoint-primary-model" name="primary_model_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200">
+                <option value="">Select primary model</option>
+                <!-- Options will be populated by JavaScript -->
+              </select>
+            </div>
+
+            <!-- Fallback Model -->
+            <div>
+              <label for="edit-endpoint-fallback-model" class="block text-sm font-medium text-gray-600 mb-2">Fallback Model</label>
+              <select id="edit-endpoint-fallback-model" name="fallback_model_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200">
+                <option value="">Select fallback model (optional)</option>
+                <!-- Options will be populated by JavaScript -->
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status -->
+        <div class="mb-6">
+          <label class="flex items-center">
+            <input type="checkbox" id="edit-endpoint-active" name="is_active" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+            <span class="ml-2 text-sm text-gray-700">Active (enable this endpoint for use)</span>
+          </label>
+        </div>
+
+        <!-- Error Message Container -->
+        <div id="edit-endpoint-error" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p class="text-sm text-red-600" id="edit-endpoint-error-message"></p>
+        </div>
+      </form>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="flex items-center justify-end space-x-3 p-6 border-t border-gray-200">
+      <button type="button" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2" onclick="closeEditEndpointModal()">Cancel</button>
+      <button type="submit" form="edit-endpoint-form" class="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">Update Endpoint</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Edit endpoint modal functionality
+let editEndpointLastFocusedElement = null;
+let editEndpointFocusableElements = [];
+let currentEditingEndpoint = null;
+
+function openEditEndpointModal(endpoint) {
+  // Store the endpoint and currently focused element
+  currentEditingEndpoint = endpoint;
+  editEndpointLastFocusedElement = document.activeElement;
+  
+  const modal = document.getElementById('edit-endpoint-modal');
+  const modalContainer = document.getElementById('edit-endpoint-container');
+  
+  // Load models and populate form
+  loadModelsForEditEndpoint().then(() => {
+    populateEditEndpointForm(endpoint);
+  });
+  
+  // Show modal
+  modal.classList.remove('hidden');
+  
+  // Trigger animations
+  setTimeout(() => {
+    modal.classList.add('opacity-100');
+    modalContainer.classList.remove('scale-95', 'opacity-0');
+    modalContainer.classList.add('scale-100', 'opacity-100');
+  }, 10);
+  
+  // Set up focus trapping
+  setupEditEndpointFocusTrap();
+  
+  // Focus the first input
+  setTimeout(() => {
+    document.getElementById('edit-endpoint-name').focus();
+  }, 100);
+  
+  // Add event listeners
+  document.addEventListener('keydown', handleEditEndpointKeyDown);
+  modal.addEventListener('click', handleEditEndpointOverlayClick);
+}
+
+function closeEditEndpointModal() {
+  const modal = document.getElementById('edit-endpoint-modal');
+  const modalContainer = document.getElementById('edit-endpoint-container');
+  
+  // Trigger close animations
+  modal.classList.remove('opacity-100');
+  modalContainer.classList.remove('scale-100', 'opacity-100');
+  modalContainer.classList.add('scale-95', 'opacity-0');
+  
+  // Hide modal after animation
+  setTimeout(() => {
+    modal.classList.add('hidden');
+    
+    // Reset form
+    document.getElementById('edit-endpoint-form').reset();
+    hideEditEndpointError();
+    currentEditingEndpoint = null;
+    
+    // Restore focus
+    if (editEndpointLastFocusedElement) {
+      editEndpointLastFocusedElement.focus();
+    }
+  }, 300);
+  
+  // Remove event listeners
+  document.removeEventListener('keydown', handleEditEndpointKeyDown);
+  modal.removeEventListener('click', handleEditEndpointOverlayClick);
+}
+
+function setupEditEndpointFocusTrap() {
+  const modal = document.getElementById('edit-endpoint-container');
+  editEndpointFocusableElements = modal.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  );
+}
+
+function handleEditEndpointKeyDown(event) {
+  if (event.key === 'Escape') {
+    closeEditEndpointModal();
+    return;
+  }
+  
+  if (event.key === 'Tab') {
+    trapEditEndpointFocus(event);
+  }
+}
+
+function trapEditEndpointFocus(event) {
+  const firstFocusable = editEndpointFocusableElements[0];
+  const lastFocusable = editEndpointFocusableElements[editEndpointFocusableElements.length - 1];
+  
+  if (event.shiftKey) {
+    // Shift + Tab
+    if (document.activeElement === firstFocusable) {
+      event.preventDefault();
+      lastFocusable.focus();
+    }
+  } else {
+    // Tab
+    if (document.activeElement === lastFocusable) {
+      event.preventDefault();
+      firstFocusable.focus();
+    }
+  }
+}
+
+function handleEditEndpointOverlayClick(event) {
+  if (event.target === event.currentTarget) {
+    closeEditEndpointModal();
+  }
+}
+
+async function loadModelsForEditEndpoint() {
+  try {
+    const response = await fetch('/api/models', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const models = data.models || [];
+    
+    const primarySelect = document.getElementById('edit-endpoint-primary-model');
+    const fallbackSelect = document.getElementById('edit-endpoint-fallback-model');
+    
+    // Clear existing options except the first one
+    while (primarySelect.children.length > 1) {
+      primarySelect.removeChild(primarySelect.lastChild);
+    }
+    while (fallbackSelect.children.length > 1) {
+      fallbackSelect.removeChild(fallbackSelect.lastChild);
+    }
+    
+    models.forEach(model => {
+      if (model.active) {
+        const primaryOption = document.createElement('option');
+        primaryOption.value = model.id;
+        primaryOption.textContent = `${model.name} (${model.provider})`;
+        primarySelect.appendChild(primaryOption);
+        
+        const fallbackOption = document.createElement('option');
+        fallbackOption.value = model.id;
+        fallbackOption.textContent = `${model.name} (${model.provider})`;
+        fallbackSelect.appendChild(fallbackOption);
+      }
+    });
+
+  } catch (error) {
+    console.error('Failed to load models:', error);
+  }
+}
+
+function populateEditEndpointForm(endpoint) {
+  document.getElementById('edit-endpoint-id').value = endpoint.id || '';
+  document.getElementById('edit-endpoint-name').value = endpoint.name || '';
+  document.getElementById('edit-endpoint-path').value = endpoint.path_prefix || '';
+  document.getElementById('edit-endpoint-description-field').value = endpoint.description || '';
+  document.getElementById('edit-endpoint-primary-model').value = endpoint.primary_model_id || '';
+  document.getElementById('edit-endpoint-fallback-model').value = endpoint.fallback_model_id || '';
+  document.getElementById('edit-endpoint-active').checked = endpoint.is_active || false;
+}
+
+function showEditEndpointError(message) {
+  const errorContainer = document.getElementById('edit-endpoint-error');
+  const errorMessage = document.getElementById('edit-endpoint-error-message');
+  
+  errorMessage.textContent = message;
+  errorContainer.classList.remove('hidden');
+}
+
+function hideEditEndpointError() {
+  const errorContainer = document.getElementById('edit-endpoint-error');
+  errorContainer.classList.add('hidden');
+}
+
+// Handle form submission
+document.getElementById('edit-endpoint-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const formData = new FormData(this);
+  const data = {};
+  const endpointId = document.getElementById('edit-endpoint-id').value;
+  
+  // Convert form data to object
+  for (let [key, value] of formData.entries()) {
+    if (key !== 'id' && value) {
+      data[key] = value;
+    }
+  }
+  
+  // Convert boolean values
+  data.is_active = document.getElementById('edit-endpoint-active').checked;
+  
+  // Remove empty values for optional fields
+  if (!data.primary_model_id) delete data.primary_model_id;
+  if (!data.fallback_model_id) delete data.fallback_model_id;
+  if (!data.description) delete data.description;
+  
+  try {
+    const response = await fetch(`/api/endpoints/${endpointId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update endpoint');
+    }
+    
+    // Success - close modal and reload endpoints
+    closeEditEndpointModal();
+    if (typeof loadEndpoints === 'function') {
+      loadEndpoints();
+    }
+    
+  } catch (error) {
+    console.error('Failed to update endpoint:', error);
+    showEditEndpointError(error.message);
+  }
+});
+</script>
