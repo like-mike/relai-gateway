@@ -8,9 +8,11 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/like-mike/relai-gateway/shared/db"
+	"github.com/like-mike/relai-gateway/shared/email"
 	"github.com/like-mike/relai-gateway/shared/models"
 	"github.com/like-mike/relai-gateway/ui/auth"
 )
@@ -545,4 +547,406 @@ func getAllADGroups(accessToken string) ([]ADGroup, error) {
 	}
 
 	return groups, nil
+}
+
+// Email-related handlers
+
+// EmailConfigHandler handles email configuration requests
+func EmailConfigHandler(c *gin.Context) {
+	database, exists := c.Get("db")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
+	}
+
+	sqlDB, ok := database.(*sql.DB)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
+	}
+
+	emailService := email.NewService(sqlDB)
+
+	if c.Request.Method == "GET" {
+		// Get email settings
+		settings, err := emailService.GetEmailSettings()
+		if err != nil {
+			log.Printf("Failed to get email settings: %v", err)
+			c.JSON(http.StatusOK, gin.H{"settings": nil})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"settings": settings})
+		return
+	}
+
+	if c.Request.Method == "POST" {
+		// Update email settings
+		var req models.UpdateEmailSettingsRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			log.Printf("Failed to bind JSON: %v", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data: " + err.Error()})
+			return
+		}
+
+		log.Printf("Received email settings update request: %+v", req)
+
+		err := emailService.UpdateEmailSettings(req)
+		if err != nil {
+			log.Printf("Failed to update email settings: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update settings"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"success": true})
+		return
+	}
+}
+
+// EmailTemplatesHandler handles email templates requests
+func EmailTemplatesHandler(c *gin.Context) {
+	database, exists := c.Get("db")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
+	}
+
+	sqlDB, ok := database.(*sql.DB)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
+	}
+
+	emailService := email.NewService(sqlDB)
+
+	if c.Request.Method == "GET" {
+		// Get all email templates
+		templates, err := emailService.GetAllEmailTemplates()
+		if err != nil {
+			log.Printf("Failed to get email templates: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load templates"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"templates": templates})
+		return
+	}
+
+	if c.Request.Method == "POST" {
+		// Create new email template
+		var req models.CreateEmailTemplateRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data"})
+			return
+		}
+
+		template, err := emailService.CreateEmailTemplate(req)
+		if err != nil {
+			log.Printf("Failed to create email template: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create template"})
+			return
+		}
+
+		c.JSON(http.StatusCreated, gin.H{"success": true, "template": template})
+		return
+	}
+}
+
+// EmailTemplateHandler handles single email template requests
+func EmailTemplateHandler(c *gin.Context) {
+	database, exists := c.Get("db")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
+	}
+
+	sqlDB, ok := database.(*sql.DB)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
+	}
+
+	emailService := email.NewService(sqlDB)
+	templateID := c.Param("id")
+
+	if c.Request.Method == "GET" {
+		// Get single email template
+		template, err := emailService.GetEmailTemplate(templateID)
+		if err != nil {
+			log.Printf("Failed to get email template: %v", err)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Template not found"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"template": template})
+		return
+	}
+
+	if c.Request.Method == "PUT" {
+		// Update email template
+		var req models.UpdateEmailTemplateRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data"})
+			return
+		}
+
+		template, err := emailService.UpdateEmailTemplate(templateID, req)
+		if err != nil {
+			log.Printf("Failed to update email template: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update template"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"success": true, "template": template})
+		return
+	}
+}
+
+// EmailTemplatePreviewHandler handles email template preview requests
+func EmailTemplatePreviewHandler(c *gin.Context) {
+	var req struct {
+		Subject  string `json:"subject"`
+		HTMLBody string `json:"html_body"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data"})
+		return
+	}
+
+	renderer := email.NewTemplateRenderer()
+
+	renderedSubject, renderedHTML, err := renderer.PreviewTemplate(req.Subject, req.HTMLBody)
+	if err != nil {
+		log.Printf("Failed to preview template: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Template preview failed: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"subject":   renderedSubject,
+		"html_body": renderedHTML,
+	})
+}
+
+// EmailTestHandler handles test email sending
+func EmailTestHandler(c *gin.Context) {
+	var req models.SendTestEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data"})
+		return
+	}
+
+	database, exists := c.Get("db")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
+	}
+
+	sqlDB, ok := database.(*sql.DB)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
+	}
+
+	emailService := email.NewService(sqlDB)
+
+	err := emailService.SendTestEmail(req)
+	if err != nil {
+		log.Printf("Failed to send test email: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send test email: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Test email sent successfully"})
+}
+
+// EmailConnectionTestHandler tests the SMTP connection
+func EmailConnectionTestHandler(c *gin.Context) {
+	database, exists := c.Get("db")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
+	}
+
+	sqlDB, ok := database.(*sql.DB)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
+	}
+
+	emailService := email.NewService(sqlDB)
+
+	// Get current email settings
+	settings, err := emailService.GetEmailSettings()
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "No email settings configured. Please save email settings first."})
+			return
+		}
+		log.Printf("Failed to get email settings: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get email settings"})
+		return
+	}
+
+	if settings == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No email settings configured"})
+		return
+	}
+
+	// Test SMTP connection
+	smtpClient := email.NewSMTPClient()
+	err = smtpClient.TestConnection(email.SMTPConfig{
+		Host:      settings.SMTPHost,
+		Port:      settings.SMTPPort,
+		Username:  settings.SMTPUsername.String,
+		Password:  settings.SMTPPassword.String,
+		FromName:  settings.SMTPFromName.String,
+		FromEmail: settings.SMTPFromEmail.String,
+	})
+
+	if err != nil {
+		log.Printf("SMTP connection test failed: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Connection test failed: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Connection test successful"})
+}
+
+// EmailLogsHandler handles email logs requests
+func EmailLogsHandler(c *gin.Context) {
+	database, exists := c.Get("db")
+	if !exists {
+		c.HTML(http.StatusInternalServerError, "email-logs-table.html", gin.H{"error": "Database connection error"})
+		return
+	}
+
+	sqlDB, ok := database.(*sql.DB)
+	if !ok {
+		c.HTML(http.StatusInternalServerError, "email-logs-table.html", gin.H{"error": "Database connection error"})
+		return
+	}
+
+	// Get recent email logs
+	query := `
+		SELECT id, recipient_email, subject, status, error_message, sent_at, created_at
+		FROM email_logs 
+		ORDER BY created_at DESC 
+		LIMIT 50`
+
+	rows, err := sqlDB.Query(query)
+	if err != nil {
+		log.Printf("Failed to get email logs: %v", err)
+		c.HTML(http.StatusInternalServerError, "email-logs-table.html", gin.H{"error": "Failed to load email logs"})
+		return
+	}
+	defer rows.Close()
+
+	var logs []EmailLogDisplay
+	for rows.Next() {
+		var logEntry models.EmailLog
+		err := rows.Scan(
+			&logEntry.ID, &logEntry.RecipientEmail, &logEntry.Subject,
+			&logEntry.Status, &logEntry.ErrorMessage, &logEntry.SentAt, &logEntry.CreatedAt,
+		)
+		if err != nil {
+			log.Printf("Failed to scan email log: %v", err)
+			continue
+		}
+
+		// Convert to display format
+		display := EmailLogDisplay{
+			RecipientEmail: logEntry.RecipientEmail,
+			Subject:        getStringValue(logEntry.Subject),
+			Status:         logEntry.Status,
+			SentAt:         logEntry.SentAt,
+			CreatedAt:      logEntry.CreatedAt,
+		}
+		logs = append(logs, display)
+	}
+
+	// Return simplified JSON structure
+	if len(logs) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"logs":    []map[string]interface{}{},
+			"message": "No emails sent yet",
+		})
+	} else {
+		// Convert to simpler format
+		var simplifiedLogs []map[string]interface{}
+		for _, log := range logs {
+			simplifiedLogs = append(simplifiedLogs, map[string]interface{}{
+				"recipient": log.RecipientEmail,
+				"subject":   log.Subject,
+				"status":    log.Status,
+				"sent_at":   log.SentAt,
+			})
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"logs":  simplifiedLogs,
+			"count": len(logs),
+		})
+	}
+}
+
+// EmailLogDisplay represents a simplified email log for display
+type EmailLogDisplay struct {
+	RecipientEmail string     `json:"recipient_email"`
+	Subject        string     `json:"subject"`
+	Status         string     `json:"status"`
+	SentAt         *time.Time `json:"sent_at"`
+	CreatedAt      time.Time  `json:"created_at"`
+}
+
+// Helper function to safely get string value from pointer
+func getStringValue(ptr *string) string {
+	if ptr != nil {
+		return *ptr
+	}
+	return ""
+}
+
+// Page handlers for individual admin sections
+
+// UsersPageHandler handles the users management page
+func UsersPageHandler(c *gin.Context) {
+	userData := auth.GetUserContext(c)
+	userData["activePage"] = "users"
+	userData["title"] = "User Management"
+
+	c.HTML(http.StatusOK, "users.html", userData)
+}
+
+// SystemPageHandler handles the system management page
+func SystemPageHandler(c *gin.Context) {
+	userData := auth.GetUserContext(c)
+	userData["activePage"] = "system"
+	userData["title"] = "System Management"
+
+	c.HTML(http.StatusOK, "system.html", userData)
+}
+
+// EmailPageHandler handles the email management page
+func EmailPageHandler(c *gin.Context) {
+	userData := auth.GetUserContext(c)
+	userData["activePage"] = "email"
+	userData["title"] = "Email Management"
+
+	c.HTML(http.StatusOK, "email.html", userData)
+}
+
+// OrganizationsPageHandler handles the organizations management page
+func OrganizationsPageHandler(c *gin.Context) {
+	userData := auth.GetUserContext(c)
+	userData["activePage"] = "organizations"
+	userData["title"] = "Organizations"
+
+	c.HTML(http.StatusOK, "organizations.html", userData)
+}
+
+// AuditLogsPageHandler handles the audit logs page
+func AuditLogsPageHandler(c *gin.Context) {
+	userData := auth.GetUserContext(c)
+	userData["activePage"] = "audit_logs"
+	userData["title"] = "Audit Logs"
+
+	c.HTML(http.StatusOK, "audit-logs.html", userData)
 }

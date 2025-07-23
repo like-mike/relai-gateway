@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-100">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Email - {{if .Config}}{{.Config.App.Name}}{{else}}RelAI Gateway{{end}}</title>
+  <script src="https://unpkg.com/htmx.org@1.9.5"></script>
+  <link href="https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  
+  <!-- Dynamic Theme CSS -->
+  <link href="/theme.css" rel="stylesheet">
+</head>
+<body class="h-full text-gray-900">
+  <!-- Banner/Header -->
+  {{template "banner.html" .}}
+
+  <!-- Main layout -->
+  <div class="flex h-screen">
+    <!-- Sidebar -->
+    {{template "sidebar.html" .}}
+
+    <!-- Main Content -->
+    <main class="flex-1 p-10 space-y-6 overflow-auto">
+      <!-- Page Header -->
+      <div class="border-b border-gray-200 pb-4">
+        <h1 class="text-2xl font-bold text-gray-900">Email</h1>
+        <p class="text-gray-600 mt-1">Manage email notifications and templates</p>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="border-b border-gray-200">
+        <nav class="-mb-px flex space-x-8">
+          <button onclick="switchTab('configuration')" id="tab-configuration" class="email-tab active whitespace-nowrap py-2 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600">
+            ⚙️ Configuration
+          </button>
+          <button onclick="switchTab('templates')" id="tab-templates" class="email-tab whitespace-nowrap py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+            📋 Templates
+          </button>
+          <button onclick="switchTab('send-test')" id="tab-send-test" class="email-tab whitespace-nowrap py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+            ✉️ Send & Test
+          </button>
+        </nav>
+      </div>
+
+      <!-- Tab Content -->
+      <div id="tab-content" class="mt-6">
+        <!-- Configuration Tab -->
+        <div id="content-configuration" class="tab-content">
+          <div class="bg-white rounded-lg shadow">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-gray-900">⚙️ Email Configuration</h2>
+              <button onclick="testEmailConnection()" class="bg-blue-600 text-white px-4 py-2 text-sm rounded hover:bg-blue-500 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                Test Connection
+              </button>
+            </div>
+            <div class="p-6">
+              <form id="email-settings-form" onsubmit="saveEmailSettings(event)">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Enable Email Notifications</label>
+                    <label class="flex items-center">
+                      <input type="checkbox" id="email-enabled" name="is_enabled" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                      <span class="ml-2 text-sm text-gray-700">Send email notifications</span>
+                    </label>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">SMTP Host</label>
+                    <input type="text" id="smtp-host" name="smtp_host" value="smtp.gmail.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">SMTP Port</label>
+                    <input type="number" id="smtp-port" name="smtp_port" value="587" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Username (Email)</label>
+                    <input type="email" id="smtp-username" name="smtp_username" placeholder="your-email@gmail.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Password (App Password)</label>
+                    <input type="password" id="smtp-password" name="smtp_password" placeholder="Gmail App Password" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <p class="text-xs text-gray-500 mt-1">Use Gmail App Password, not your regular password</p>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">From Name</label>
+                    <input type="text" id="smtp-from-name" name="smtp_from_name" value="RelAI Gateway" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">From Email</label>
+                    <input type="email" id="smtp-from-email" name="smtp_from_email" placeholder="noreply@your-domain.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  </div>
+                </div>
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                  <button type="submit" class="bg-blue-600 text-white px-4 py-2 text-sm rounded hover:bg-blue-500 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    Save Email Settings
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Templates Tab -->
+        <div id="content-templates" class="tab-content hidden">
+          <div class="bg-white rounded-lg shadow">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-gray-900">📋 Email Templates</h2>
+              <button onclick="createNewTemplate()" class="bg-green-600 text-white px-4 py-2 text-sm rounded hover:bg-green-500 transition focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                + New Template
+              </button>
+            </div>
+            <div class="p-6">
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <h3 class="text-md font-medium text-gray-900 mb-4">Email Templates</h3>
+                  <div id="templates-list" hx-get="/admin/settings/email/templates" hx-trigger="load" hx-target="#templates-list">
+                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                    <p class="text-center text-gray-500 mt-2">Loading templates...</p>
+                  </div>
+                </div>
+                <div>
+                  <h3 class="text-md font-medium text-gray-900 mb-4">Template Editor</h3>
+                  <form id="template-editor-form" onsubmit="saveTemplate(event)">
+                    <input type="hidden" id="template-id" name="template_id">
+                    <div class="space-y-4">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Template Name</label>
+                        <input type="text" id="template-name" name="name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                      </div>
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Type</label>
+                        <select id="template-type" name="type" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                          <option value="warning">API Key Warning</option>
+                          <option value="expiration">API Key Expiration</option>
+                          <option value="usage">Usage Alert</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Subject</label>
+                        <input type="text" id="template-subject" name="subject" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                      </div>
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">HTML Body</label>
+                        <textarea id="template-html" name="html_body" rows="10" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"></textarea>
+                      </div>
+                      <div class="flex space-x-2">
+                        <button type="button" onclick="previewTemplate()" class="bg-gray-600 text-white px-4 py-2 text-sm rounded hover:bg-gray-500 transition">
+                          Preview
+                        </button>
+                        <button type="submit" class="bg-blue-600 text-white px-4 py-2 text-sm rounded hover:bg-blue-500 transition">
+                          Save Template
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </div>
+              <div class="mt-6 p-4 bg-blue-50 rounded-lg">
+                <h4 class="text-sm font-medium text-blue-900 mb-2">Available Variables:</h4>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-blue-700">
+                  <div><code>{{.UserName}}</code> - User name</div>
+                  <div><code>{{.APIKeyName}}</code> - API key name</div>
+                  <div><code>{{.ExpirationDate}}</code> - Expiration date</div>
+                  <div><code>{{.OrganizationName}}</code> - Organization</div>
+                  <div><code>{{.DaysUntilExpiration}}</code> - Days left</div>
+                  <div><code>{{.ManagementURL}}</code> - Management URL</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Send & Test Tab -->
+        <div id="content-send-test" class="tab-content hidden">
+          <div class="bg-white rounded-lg shadow">
+            <div class="px-6 py-4 border-b border-gray-200">
+              <h2 class="text-lg font-semibold text-gray-900">✉️ Send & Test</h2>
+            </div>
+            <div class="p-6">
+              <div class="max-w-md mx-auto">
+                <h3 class="text-md font-medium text-gray-900 mb-4">Send Test Email</h3>
+                <form id="test-email-form" onsubmit="sendTestEmail(event)">
+                  <div class="space-y-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">To Email</label>
+                      <input type="email" id="test-email-to" name="to_email" placeholder="test@example.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Template</label>
+                      <select id="test-template-select" name="template_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Select a template...</option>
+                      </select>
+                    </div>
+                    <div>
+                      <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 text-sm rounded hover:bg-blue-500 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                        Send Test Email
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Tab switching functionality
+    function switchTab(tabName) {
+      // Hide all tab contents
+      document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.add('hidden');
+      });
+      
+      // Remove active class from all tabs
+      document.querySelectorAll('.email-tab').forEach(tab => {
+        tab.classList.remove('active', 'border-blue-500', 'text-blue-600');
+        tab.classList.add('border-transparent', 'text-gray-500');
+      });
+      
+      // Show selected tab content
+      document.getElementById(`content-${tabName}`).classList.remove('hidden');
+      
+      // Add active class to selected tab
+      const activeTab = document.getElementById(`tab-${tabName}`);
+      activeTab.classList.add('active', 'border-blue-500', 'text-blue-600');
+      activeTab.classList.remove('border-transparent', 'text-gray-500');
+    }
+
+    // Email settings functionality
+    function saveEmailSettings(event) {
+      event.preventDefault();
+      const formData = new FormData(event.target);
+      const data = Object.fromEntries(formData);
+      data.is_enabled = document.getElementById('email-enabled').checked;
+      
+      fetch('/admin/settings/email/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          alert('Email settings saved successfully!');
+        } else {
+          alert('Failed to save email settings: ' + (result.error || 'Unknown error'));
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to save email settings');
+      });
+    }
+
+    function testEmailConnection() {
+      fetch('/admin/settings/email/test-connection', {
+        method: 'POST'
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          alert('Connection test successful!');
+        } else {
+          alert('Connection test failed: ' + (result.error || 'Unknown error'));
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Connection test failed');
+      });
+    }
+
+    function sendTestEmail(event) {
+      event.preventDefault();
+      const formData = new FormData(event.target);
+      const data = Object.fromEntries(formData);
+      
+      fetch('/admin/settings/email/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          alert('Test email sent successfully!');
+        } else {
+          alert('Failed to send test email: ' + (result.error || 'Unknown error'));
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to send test email');
+      });
+    }
+  </script>
+</body>
+</html>

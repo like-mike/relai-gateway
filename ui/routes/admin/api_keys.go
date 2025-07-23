@@ -485,13 +485,153 @@ func CompletionsProxyHandler(c *gin.Context) {
 	}
 	defer resp.Body.Close()
 
-	// Forward streaming response directly to client
-	c.Status(resp.StatusCode)
-	for k, v := range resp.Header {
-		for _, vv := range v {
-			c.Writer.Header().Add(k, vv)
+	// Handle streaming vs non-streaming responses
+	if req.Stream {
+		// Copy all headers from upstream response
+		for k, v := range resp.Header {
+			for _, vv := range v {
+				c.Writer.Header().Add(k, vv)
+			}
 		}
+		c.Status(resp.StatusCode)
+
+		// Stream response with proper flushing for real-time delivery
+		buffer := make([]byte, 1024)
+		for {
+			n, err := resp.Body.Read(buffer)
+			if n > 0 {
+				if _, writeErr := c.Writer.Write(buffer[:n]); writeErr != nil {
+					log.Printf("ProxyHandler: Error writing streaming chunk: %v", writeErr)
+					return
+				}
+				// Flush immediately to ensure real-time streaming
+				if flusher, ok := c.Writer.(http.Flusher); ok {
+					flusher.Flush()
+				}
+			}
+			if err != nil {
+				if err == io.EOF {
+					log.Printf("ProxyHandler: Streaming completed")
+					break
+				}
+				log.Printf("ProxyHandler: Error reading streaming response: %v", err)
+				break
+			}
+		}
+	} else {
+		// Forward non-streaming response
+		c.Status(resp.StatusCode)
+		for k, v := range resp.Header {
+			for _, vv := range v {
+				c.Writer.Header().Add(k, vv)
+			}
+		}
+		io.Copy(c.Writer, resp.Body)
+	}
+}
+
+// TEMP: Test endpoint for debugging streaming without auth
+func TestStreamingHandler(c *gin.Context) {
+	log.Printf("TestStreamingHandler: Starting test streaming endpoint")
+
+	type TestRequest struct {
+		Message string `json:"message"`
+		Stream  bool   `json:"stream"`
+	}
+
+	var req TestRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("TestStreamingHandler: Invalid request: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	// Hardcode values for testing
+	testMessage := req.Message
+	if testMessage == "" {
+		testMessage = "Hello, how are you?"
+	}
+
+	log.Printf("TestStreamingHandler: Message: %s, Stream: %v", testMessage, req.Stream)
+
+	// Build the request to the completions API
+	payload := map[string]interface{}{
+		"model":    "gpt-4",
+		"messages": []map[string]string{{"role": "user", "content": testMessage}},
+		"stream":   req.Stream,
+	}
+	body, _ := json.Marshal(payload)
+	log.Printf("TestStreamingHandler: Upstream payload: %s", string(body))
+
+	// Hardcode provider URL and API key (replace with your actual OpenAI API key)
+	providerURL := "https://api.openai.com/v1/chat/completions"
+	hardcodedAPIKey := "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" // REPLACE THIS WITH YOUR ACTUAL API KEY
+
+	httpReq, err := http.NewRequest("POST", providerURL, bytes.NewReader(body))
+	if err != nil {
+		log.Printf("TestStreamingHandler: Failed to build request: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to build upstream request"})
+		return
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+hardcodedAPIKey)
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		log.Printf("TestStreamingHandler: Upstream request failed: %v", err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Upstream provider error"})
+		return
 	}
 	defer resp.Body.Close()
-	io.Copy(c.Writer, resp.Body)
+
+	log.Printf("TestStreamingHandler: Upstream response status: %d", resp.StatusCode)
+
+	// Handle streaming vs non-streaming responses
+	if req.Stream {
+		log.Printf("TestStreamingHandler: Setting up streaming response")
+		// Copy all headers from upstream response
+		for k, v := range resp.Header {
+			for _, vv := range v {
+				c.Writer.Header().Add(k, vv)
+			}
+		}
+		c.Status(resp.StatusCode)
+
+		// Stream response with proper flushing for real-time delivery
+		buffer := make([]byte, 1024)
+		for {
+			n, err := resp.Body.Read(buffer)
+			if n > 0 {
+				if _, writeErr := c.Writer.Write(buffer[:n]); writeErr != nil {
+					log.Printf("TestStreamingHandler: Error writing streaming chunk: %v", writeErr)
+					return
+				}
+				// Flush immediately to ensure real-time streaming
+				if flusher, ok := c.Writer.(http.Flusher); ok {
+					flusher.Flush()
+				}
+				log.Printf("TestStreamingHandler: Wrote and flushed %d bytes", n)
+			}
+			if err != nil {
+				if err == io.EOF {
+					log.Printf("TestStreamingHandler: Streaming completed")
+					break
+				}
+				log.Printf("TestStreamingHandler: Error reading streaming response: %v", err)
+				break
+			}
+		}
+	} else {
+		log.Printf("TestStreamingHandler: Setting up non-streaming response")
+		// Forward non-streaming response
+		c.Status(resp.StatusCode)
+		for k, v := range resp.Header {
+			for _, vv := range v {
+				c.Writer.Header().Add(k, vv)
+			}
+		}
+		io.Copy(c.Writer, resp.Body)
+	}
+
+	log.Printf("TestStreamingHandler: Response complete")
 }

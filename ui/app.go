@@ -44,9 +44,14 @@ func main() {
 		"templates/pages/auth/login.html",
 		"templates/pages/admin/api-keys.html",
 		"templates/pages/admin/models.html",
+		"templates/pages/admin/audit-logs.html",
 		"templates/pages/admin/analytics.html",
 		"templates/pages/admin/test-api.html",
 		"templates/pages/admin/settings.html",
+		"templates/pages/admin/organizations.html",
+		"templates/pages/admin/users.html",
+		"templates/pages/admin/system.html",
+		"templates/pages/admin/email.html",
 		"templates/pages/admin/docs.html",
 		"templates/components/ui/banner.html",
 		"templates/components/ui/sidebar.html",
@@ -56,6 +61,7 @@ func main() {
 		"templates/partials/api-keys-table.html",
 		"templates/partials/organizations-table.html",
 		"templates/partials/users-table.html",
+		"templates/partials/email-logs-table.html",
 		"templates/components/modals/api-keys/new-key-modal.html",
 		"templates/components/modals/api-keys/view-key-modal.html",
 		"templates/components/modals/api-keys/delete-confirmation-modal.html",
@@ -63,9 +69,6 @@ func main() {
 		"templates/components/modals/models/edit-model-modal.html",
 		"templates/components/modals/models/delete-model-modal.html",
 		"templates/components/modals/models/manage-access-modal.html",
-		"templates/components/modals/endpoints/add-endpoint-modal.html",
-		"templates/components/modals/endpoints/edit-endpoint-modal.html",
-		"templates/components/modals/endpoints/delete-endpoint-modal.html",
 		"templates/components/modals/organizations/create-org-modal.html",
 		"templates/components/modals/organizations/edit-org-modal.html",
 		"templates/shared/theme.css",
@@ -116,12 +119,17 @@ func main() {
 		c.HTML(http.StatusOK, "test-api.html", userData)
 	})
 	authorized.GET("/admin/settings", admin.SettingsHandler)
-	authorized.GET("/admin/analytics", func(c *gin.Context) {
+	authorized.GET("/admin/settings/organizations", admin.OrganizationsPageHandler)
+	authorized.GET("/admin/settings/users", admin.UsersPageHandler)
+	authorized.GET("/admin/settings/system", admin.SystemPageHandler)
+	authorized.GET("/admin/settings/email", admin.EmailPageHandler)
+	authorized.GET("/admin/analytics/usage", func(c *gin.Context) {
 		userData := auth.GetUserContext(c)
-		userData["activePage"] = "analytics"
+		userData["activePage"] = "usage_analytics"
 		userData["title"] = "Usage Analytics"
 		c.HTML(http.StatusOK, "analytics.html", userData)
 	})
+	authorized.GET("/admin/analytics/audit-logs", admin.AuditLogsPageHandler)
 	authorized.GET("/admin/docs", func(c *gin.Context) {
 		userData := auth.GetUserContext(c)
 		userData["activePage"] = "docs"
@@ -143,22 +151,29 @@ func main() {
 	authorized.GET("/api/analytics/dashboard", admin.AnalyticsDashboardHandler)
 	authorized.POST("/api/completions-proxy", admin.CompletionsProxyHandler)
 
-	// Endpoints API routes
-	authorized.GET("/api/endpoints", admin.EndpointsHandler)
-	authorized.POST("/api/endpoints", admin.CreateEndpointHandler)
-	authorized.GET("/api/endpoints/:id", admin.GetEndpointHandler)
-	authorized.PUT("/api/endpoints/:id", admin.UpdateEndpointHandler)
-	authorized.DELETE("/api/endpoints/:id", admin.DeleteEndpointHandler)
+	// TEMP: Test endpoint for debugging streaming without auth (remove in production)
+	r.POST("/api/test-streaming", admin.TestStreamingHandler)
 
-	// Settings endpoints
-	authorized.GET("/admin/settings/organizations", admin.OrganizationsTableHandler)
+	// Settings API endpoints (for tables and forms)
+	authorized.GET("/admin/settings/organizations/table", admin.OrganizationsTableHandler)
 	authorized.POST("/admin/settings/organizations", admin.CreateOrganizationHandler)
 	authorized.GET("/admin/settings/organizations/:id", admin.GetOrganizationHandler)
 	authorized.PUT("/admin/settings/organizations/:id", admin.UpdateOrganizationHandler)
 	authorized.POST("/admin/settings/organizations/:id", admin.UpdateOrganizationHandler) // HTMX form support
 	authorized.DELETE("/admin/settings/organizations/:id", admin.DeleteOrganizationHandler)
-	authorized.GET("/admin/settings/users", admin.UsersTableHandler)
+	authorized.GET("/admin/settings/users/table", admin.UsersTableHandler)
 	authorized.GET("/admin/settings/ad-groups", admin.GetADGroupsHandler)
+
+	// Email settings routes
+	authorized.GET("/admin/settings/email/config", admin.EmailConfigHandler)
+	authorized.POST("/admin/settings/email/config", admin.EmailConfigHandler)
+	authorized.GET("/admin/settings/email/templates", admin.EmailTemplatesHandler)
+	authorized.POST("/admin/settings/email/templates", admin.EmailTemplatesHandler)
+	authorized.GET("/admin/settings/email/templates/:id", admin.EmailTemplateHandler)
+	authorized.PUT("/admin/settings/email/templates/:id", admin.EmailTemplateHandler)
+	authorized.POST("/admin/settings/email/templates/preview", admin.EmailTemplatePreviewHandler)
+	authorized.POST("/admin/settings/email/test", admin.EmailTestHandler)
+	authorized.POST("/admin/settings/email/test-connection", admin.EmailConnectionTestHandler)
 
 	// Run server
 	port := os.Getenv("UI_PORT")

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>API Keys - {{if .Config}}{{.Config.App.Name}}{{else}}RelAI Gateway{{end}}</title>
+  <title>Virtual Keys - {{if .Config}}{{.Config.App.Name}}{{else}}RelAI Gateway{{end}}</title>
   <script src="https://unpkg.com/htmx.org@1.9.5"></script>
   <link href="https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   
@@ -37,7 +37,7 @@
       <!-- API Keys Section -->
       <div class="bg-white rounded-lg shadow">
         <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-gray-900">API Keys</h2>
+          <h2 class="text-lg font-semibold text-gray-900">Virtual Keys</h2>
           <button onclick="openNewKeyModal()" class="bg-blue-600 text-white px-4 py-2 text-sm rounded hover:bg-blue-500 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">+ New Key</button>
         </div>
         <div class="overflow-x-auto">

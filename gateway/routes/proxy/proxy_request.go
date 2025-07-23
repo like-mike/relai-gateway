@@ -147,19 +147,6 @@ func writeDownstreamResponse(cfg *middleware.AccessibleModel, c *gin.Context, re
 	}
 	defer resp.Body.Close()
 
-	// Read response body for usage extraction
-	responseBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		span.SetAttributes(attribute.String("error.message", err.Error()))
-		c.String(http.StatusInternalServerError, "failed to read provider response")
-
-		// Track the failed request
-		c.Status(http.StatusInternalServerError)
-		errorResponse := []byte(`{"error": {"message": "failed to read provider response", "type": "gateway_error"}}`)
-		trackUsageFromResponse(cfg, c, errorResponse, startTime)
-		return
-	}
-
 	// Copy headers to client
 	for hk, hv := range resp.Header {
 		for _, v := range hv {
@@ -179,20 +166,75 @@ func writeDownstreamResponse(cfg *middleware.AccessibleModel, c *gin.Context, re
 		span.SetAttributes(attribute.String("error.message", http.StatusText(resp.StatusCode)))
 	}
 
-	// Write response body to client
-	if _, err = c.Writer.Write(responseBody); err != nil {
-		span.SetAttributes(attribute.String("error.message", err.Error()))
-		c.String(http.StatusInternalServerError, "failed to stream provider response")
-		return
-	}
+	// Check if this is a streaming response by looking at Content-Type header
+	contentType := resp.Header.Get("Content-Type")
+	isStreamingResponse := strings.Contains(contentType, "text/event-stream") || strings.Contains(contentType, "text/plain")
 
-	// Track usage for all responses (both successful and failed)
-	// Debug: log response characteristics for streaming detection
-	if len(responseBody) > 0 {
-		isStreaming := strings.Contains(string(responseBody[:min(100, len(responseBody))]), "data:")
-		log.Printf("Response tracking - Length: %d, IsStreaming: %v, Status: %d", len(responseBody), isStreaming, resp.StatusCode)
+	if isStreamingResponse {
+		log.Printf("Detected streaming response, using optimized streaming with flushing")
+		// For streaming responses, use chunk-by-chunk reading with explicit flushing
+		var responseBuffer bytes.Buffer
+		buffer := make([]byte, 4096) // Optimized buffer size
+
+		for {
+			n, err := resp.Body.Read(buffer)
+			if n > 0 {
+				// Write to client immediately
+				if _, writeErr := c.Writer.Write(buffer[:n]); writeErr != nil {
+					span.SetAttributes(attribute.String("error.message", writeErr.Error()))
+					log.Printf("Failed to write streaming chunk: %v", writeErr)
+					return
+				}
+
+				// Flush immediately for real-time delivery
+				if flusher, ok := c.Writer.(http.Flusher); ok {
+					flusher.Flush()
+				}
+
+				// Also capture for token logging (efficient in-memory operation)
+				responseBuffer.Write(buffer[:n])
+			}
+
+			if err != nil {
+				if err == io.EOF {
+					log.Printf("Streaming completed successfully")
+					break
+				}
+				span.SetAttributes(attribute.String("error.message", err.Error()))
+				log.Printf("Error reading streaming response: %v", err)
+				break
+			}
+		}
+
+		// Track usage with captured response data
+		responseBody := responseBuffer.Bytes()
+		log.Printf("Streaming response completed - Length: %d", len(responseBody))
+		trackUsageFromResponse(cfg, c, responseBody, startTime)
+	} else {
+		log.Printf("Detected non-streaming response, reading full body")
+		// For non-streaming responses, read all then write (existing behavior)
+		responseBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			span.SetAttributes(attribute.String("error.message", err.Error()))
+			c.String(http.StatusInternalServerError, "failed to read provider response")
+
+			// Track the failed request
+			c.Status(http.StatusInternalServerError)
+			errorResponse := []byte(`{"error": {"message": "failed to read provider response", "type": "gateway_error"}}`)
+			trackUsageFromResponse(cfg, c, errorResponse, startTime)
+			return
+		}
+
+		// Write response body to client
+		if _, err = c.Writer.Write(responseBody); err != nil {
+			span.SetAttributes(attribute.String("error.message", err.Error()))
+			c.String(http.StatusInternalServerError, "failed to write provider response")
+			return
+		}
+
+		log.Printf("Non-streaming response completed - Length: %d", len(responseBody))
+		trackUsageFromResponse(cfg, c, responseBody, startTime)
 	}
-	trackUsageFromResponse(cfg, c, responseBody, startTime)
 }
 
 // Helper function for min

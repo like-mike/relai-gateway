@@ -1,32 +1,80 @@
 <nav class="w-64 bg-gray-800 text-white flex flex-col py-8 px-4 h-full">
   <div class="mb-6">
-    <div class="text-sm font-semibold text-gray-400 px-2">ADMIN MENU</div>
+    <div class="text-sm font-semibold text-gray-400 px-2">RelAI Console</div>
   </div>
   <ul class="space-y-2">
     <li>
-      <a href="/admin" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "api_keys"}} bg-gray-700{{end}}">
-        API Keys
-      </a>
+      <div class="block px-4 py-2 text-gray-300 font-medium">
+        Developer Tools
+      </div>
+      <ul class="ml-4 space-y-1">
+        <li>
+          <a href="/admin" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "api_keys"}} bg-gray-700{{end}}">
+            Virtual Keys
+          </a>
+        </li>
+        <li>
+          <a href="/admin/test-api" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "test_api"}} bg-gray-700{{end}}">
+            API Playground
+          </a>
+        </li>
+      </ul>
     </li>
     <li>
-      <a href="/admin/models" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "models"}} bg-gray-700{{end}}">
-        Models + Endpoints
-      </a>
+      <div class="block px-4 py-2 text-gray-300 font-medium">
+        AI Infrastructure
+      </div>
+      <ul class="ml-4 space-y-1">
+        <li>
+          <a href="/admin/models" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "models"}} bg-gray-700{{end}}">
+            Models
+          </a>
+        </li>
+      </ul>
     </li>
     <li>
-      <a href="/admin/analytics" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "analytics"}} bg-gray-700{{end}}">
+      <div class="block px-4 py-2 text-gray-300 font-medium">
         Analytics
-      </a>
+      </div>
+      <ul class="ml-4 space-y-1">
+        <li>
+          <a href="/admin/analytics/usage" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "usage_analytics"}} bg-gray-700{{end}}">
+            Usage Analytics
+          </a>
+        </li>
+        <li>
+          <a href="/admin/analytics/audit-logs" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "audit_logs"}} bg-gray-700{{end}}">
+            Audit Logs
+          </a>
+        </li>
+      </ul>
     </li>
     <li>
-      <a href="/admin/test-api" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "test_api"}} bg-gray-700{{end}}">
-        Test API
-      </a>
-    </li>
-    <li>
-      <a href="/admin/settings" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "settings"}} bg-gray-700{{end}}">
+      <div class="block px-4 py-2 text-gray-300 font-medium">
         Settings
-      </a>
+      </div>
+      <ul class="ml-4 space-y-1">
+        <li>
+          <a href="/admin/settings/organizations" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "organizations"}} bg-gray-700{{end}}">
+            Organizations
+          </a>
+        </li>
+        <li>
+          <a href="/admin/settings/users" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "users"}} bg-gray-700{{end}}">
+            Users
+          </a>
+        </li>
+        <li>
+          <a href="/admin/settings/system" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "system"}} bg-gray-700{{end}}">
+            System
+          </a>
+        </li>
+        <li>
+          <a href="/admin/settings/email" class="block px-4 py-2 rounded-lg hover:bg-gray-700{{if eq .activePage "email"}} bg-gray-700{{end}}">
+            Email
+          </a>
+        </li>
+      </ul>
     </li>
   </ul>
 </nav>

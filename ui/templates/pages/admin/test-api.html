@@ -3,9 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Test API - RelAI Gateway</title>
+  <title>API Playground - RelAI Gateway</title>
   <script src="https://unpkg.com/htmx.org@1.9.5"></script>
   <link href="https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  
+  <!-- Markdown and Code Highlighting -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@9.1.2/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   
   <!-- Dynamic Theme CSS -->
   <link href="/theme.css" rel="stylesheet">
@@ -21,7 +26,7 @@
 
     <!-- Main Content -->
     <main class="flex-1 p-10 space-y-6 overflow-auto">
-      <h1 class="text-2xl font-bold text-gray-900">Test API</h1>
+      <h1 class="text-2xl font-bold text-gray-900">API Playground</h1>
       
       <!-- Organization Selector -->
       {{template "org-selector.html" .}}
@@ -44,14 +49,6 @@
             <select id="model-select" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled>
               <option value="">Select a model...</option>
             </select>
-          </div>
-          <!-- Streaming Toggle -->
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Streaming</label>
-            <div class="flex items-center">
-              <input type="checkbox" id="streaming-toggle" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-              <label for="streaming-toggle" class="ml-2 block text-sm text-gray-700">Enable streaming</label>
-            </div>
           </div>
           <!-- Clear Chat -->
           <div class="mt-auto">
@@ -104,6 +101,20 @@
 
       // Initialize the page
       document.addEventListener('DOMContentLoaded', function() {
+        // Configure marked for better rendering
+        marked.setOptions({
+          highlight: function(code, lang) {
+            if (lang && hljs.getLanguage(lang)) {
+              try {
+                return hljs.highlight(code, { language: lang }).value;
+              } catch (err) {}
+            }
+            return hljs.highlightAuto(code).value;
+          },
+          breaks: true,
+          gfm: true
+        });
+        
         updateSendButtonState();
         
         // Listen for org changes from the org-selector partial
@@ -304,8 +315,6 @@
         const apiKeySelect = document.getElementById('api-key-select');
         const modelSelect = document.getElementById('model-select');
         const messageInput = document.getElementById('message-input');
-        const streamingToggle = document.getElementById('streaming-toggle');
-        
         if (!window.currentOrgId || !apiKeySelect.value || !modelSelect.value || !messageInput.value.trim() || isLoading) {
           return;
         }
@@ -314,7 +323,7 @@
         const selectedOrganization = window.currentOrgId;
         const selectedAPIKey = apiKeySelect.value;
         const selectedModel = modelSelect.value;
-        const isStreaming = streamingToggle.checked;
+        const isStreaming = true; // Always enable streaming
         
         // Find the actual API key from our stored keys
         const apiKey = apiKeys.find(key => key.id === selectedAPIKey);
@@ -399,18 +408,33 @@
             if (done) break;
 
             const chunk = decoder.decode(value, { stream: true });
+            console.log('🔄 Streaming chunk received:', chunk);
+            
+            // Split by lines and process each line
             const lines = chunk.split('\n');
 
             for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6);
-                if (data === '[DONE]') continue;
+              const trimmedLine = line.trim();
+              if (!trimmedLine) continue;
+              
+              console.log('🔄 Processing line:', trimmedLine);
+              
+              if (trimmedLine.startsWith('data: ')) {
+                const data = trimmedLine.slice(6);
+                console.log('🔄 SSE data:', data);
+                
+                if (data === '[DONE]') {
+                  console.log('🔄 Stream completed');
+                  continue;
+                }
 
                 try {
                   const parsed = JSON.parse(data);
+                  console.log('🔄 Parsed SSE data:', parsed);
                   const delta = parsed.choices?.[0]?.delta?.content;
                   
                   if (delta) {
+                    console.log('🔄 Delta content:', delta);
                     assistantMessage += delta;
                     if (!messageElement) {
                       messageElement = addMessage('assistant', '');
@@ -418,7 +442,7 @@
                     updateMessageContent(messageElement, assistantMessage);
                   }
                 } catch (e) {
-                  // Skip invalid JSON
+                  console.warn('🔄 Failed to parse SSE JSON:', data, e);
                 }
               }
             }
@@ -426,6 +450,7 @@
           
           if (assistantMessage) {
             chatHistory.push({ role: 'assistant', content: assistantMessage });
+            console.log('🔄 Final assistant message:', assistantMessage);
           }
         } catch (error) {
           console.error('Error reading stream:', error);
@@ -454,8 +479,18 @@
         }`;
         
         const messageText = document.createElement('div');
-        messageText.className = role === 'user' ? 'text-white' : 'text-gray-900';
-        messageText.textContent = content;
+        messageText.className = role === 'user' ? 'text-white' : 'text-gray-900 prose prose-sm max-w-none';
+        
+        if (role === 'user') {
+          messageText.textContent = content;
+        } else {
+          // For assistant messages, render as markdown
+          messageText.innerHTML = content ? marked.parse(content) : '';
+          // Apply syntax highlighting to code blocks
+          messageText.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightElement(block);
+          });
+        }
         
         messageContent.appendChild(messageText);
         messageDiv.appendChild(messageContent);
@@ -469,7 +504,17 @@
 
       // Update message content (for streaming)
       function updateMessageContent(element, content) {
-        element.textContent = content;
+        if (element.closest('.flex').querySelector('.bg-blue-600')) {
+          // User message - plain text
+          element.textContent = content;
+        } else {
+          // Assistant message - render markdown
+          element.innerHTML = marked.parse(content);
+          // Apply syntax highlighting to code blocks
+          element.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightElement(block);
+          });
+        }
         const container = document.getElementById('messages-container');
         container.scrollTop = container.scrollHeight;
       }

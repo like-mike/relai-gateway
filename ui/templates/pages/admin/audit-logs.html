@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-100">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Audit Logs - {{if .Config}}{{.Config.App.Name}}{{else}}RelAI Gateway{{end}}</title>
+  <script src="https://unpkg.com/htmx.org@1.9.5"></script>
+  <link href="https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  
+  <!-- Dynamic Theme CSS -->
+  <link href="/theme.css" rel="stylesheet">
+</head>
+<body class="h-full text-gray-900">
+  <!-- Banner/Header -->
+  {{template "banner.html" .}}
+
+  <!-- Main layout -->
+  <div class="flex h-screen">
+    <!-- Sidebar -->
+    {{template "sidebar.html" .}}
+
+    <!-- Main Content -->
+    <main class="flex-1 p-10 space-y-6 overflow-auto">
+      <!-- Page Header -->
+      <div class="border-b border-gray-200 pb-4">
+        <h1 class="text-2xl font-bold text-gray-900">Audit Logs</h1>
+        <p class="text-gray-600 mt-1">View system activity and security events</p>
+      </div>
+
+      <!-- Filters Section -->
+      <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b border-gray-200">
+          <h2 class="text-lg font-semibold text-gray-900">🔍 Filters</h2>
+        </div>
+        <div class="p-6">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+              <select id="date-range" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="7d" selected>Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="custom">Custom Range</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Event Type</label>
+              <select id="event-type" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">All Events</option>
+                <option value="auth">Authentication</option>
+                <option value="api_key">API Key Management</option>
+                <option value="organization">Organization Changes</option>
+                <option value="user">User Management</option>
+                <option value="model">Model Access</option>
+                <option value="system">System Configuration</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">User</label>
+              <input type="text" id="user-filter" placeholder="Filter by user..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div class="flex items-end">
+              <button onclick="applyFilters()" class="w-full bg-blue-600 text-white px-4 py-2 text-sm rounded hover:bg-blue-500 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Audit Logs Table -->
+      <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-gray-900">📋 Audit Events</h2>
+          <div class="flex items-center space-x-2">
+            <button onclick="refreshLogs()" class="text-gray-600 hover:text-gray-900 p-2 rounded transition">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+            </button>
+            <button onclick="exportLogs()" class="bg-gray-600 text-white px-3 py-1 text-sm rounded hover:bg-gray-500 transition">
+              Export
+            </button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <div id="audit-logs-table">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event Type</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Resource</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <!-- Sample audit log entries for demonstration -->
+                <tr class="hover:bg-gray-50">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2025-01-23 10:30:15</td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">🔐 Authentication</span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">admin@example.com</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">User Login</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">192.168.1.100</td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Success</span>
+                  </td>
+                </tr>
+                <tr class="hover:bg-gray-50">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2025-01-23 10:25:42</td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">🔑 API Key</span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">admin@example.com</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">API Key Created</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Production Key</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">192.168.1.100</td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Success</span>
+                  </td>
+                </tr>
+                <tr class="hover:bg-gray-50">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2025-01-23 10:20:18</td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">🏢 Organization</span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">admin@example.com</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Organization Updated</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Acme Corp</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">192.168.1.100</td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Success</span>
+                  </td>
+                </tr>
+                <tr class="hover:bg-gray-50">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2025-01-23 10:15:30</td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">🔐 Authentication</span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">user@example.com</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Failed Login Attempt</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">10.0.0.50</td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Failed</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <!-- Pagination -->
+        <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+          <div class="text-sm text-gray-700">
+            Showing <span class="font-medium">1</span> to <span class="font-medium">10</span> of <span class="font-medium">247</span> results
+          </div>
+          <div class="flex space-x-2">
+            <button class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50" disabled>Previous</button>
+            <button class="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-500">1</button>
+            <button class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">2</button>
+            <button class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">3</button>
+            <button class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">Next</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function applyFilters() {
+      const dateRange = document.getElementById('date-range').value;
+      const eventType = document.getElementById('event-type').value;
+      const userFilter = document.getElementById('user-filter').value;
+      
+      // In a real implementation, this would make an HTMX request to filter the logs
+      console.log('Applying filters:', { dateRange, eventType, userFilter });
+      
+      // For demo purposes, show a loading state
+      showLoading();
+      setTimeout(() => {
+        hideLoading();
+      }, 1000);
+    }
+
+    function refreshLogs() {
+      showLoading();
+      // In a real implementation, this would reload the audit logs
+      setTimeout(() => {
+        hideLoading();
+      }, 500);
+    }
+
+    function exportLogs() {
+      // In a real implementation, this would export the filtered logs
+      alert('Export functionality would be implemented here');
+    }
+
+    function showLoading() {
+      const table = document.getElementById('audit-logs-table');
+      table.innerHTML = `
+        <div class="flex items-center justify-center py-12">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span class="ml-2 text-gray-600">Loading audit logs...</span>
+        </div>
+      `;
+    }
+
+    function hideLoading() {
+      // In a real implementation, this would restore the table content
+      location.reload();
+    }
+
+    // Auto-refresh every 30 seconds for real-time updates
+    setInterval(refreshLogs, 30000);
+  </script>
+</body>
+</html>
