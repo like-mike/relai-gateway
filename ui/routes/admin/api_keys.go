@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/like-mike/relai-gateway/shared/db"
 	"github.com/like-mike/relai-gateway/shared/models"
+	"github.com/like-mike/relai-gateway/ui/auth"
 )
 
 func APIKeysHandler(c *gin.Context) {
@@ -48,7 +49,7 @@ func APIKeysHandler(c *gin.Context) {
 	orgID := c.Query("org_id")
 
 	// Get user context for RBAC
-	userContext := GetUserContext(c)
+	userContext := auth.GetUserContext(c)
 	userID, ok := userContext["id"].(string)
 	if !ok || userID == "" {
 		log.Printf("No user ID found in context for API keys request")
@@ -187,7 +188,7 @@ func CreateAPIKeyHandler(c *gin.Context) {
 	log.Printf("SUCCESS: Parsed request: %+v", req)
 
 	// Get current user from context and set as creator
-	userData := GetUserContext(c)
+	userData := auth.GetUserContext(c)
 	if userID, ok := userData["id"].(string); ok && userID != "" {
 		log.Printf("Creating API key for user ID: %s", userID)
 		req.UserID = &userID
@@ -267,7 +268,7 @@ func DeleteAPIKeyHandler(c *gin.Context) {
 	}
 
 	// Get user context for RBAC
-	userContext := GetUserContext(c)
+	userContext := auth.GetUserContext(c)
 	userID, ok := userContext["id"].(string)
 	if !ok || userID == "" {
 		log.Printf("No user ID found in context for delete API key request")
@@ -384,7 +385,7 @@ func OrganizationsHandler(c *gin.Context) {
 	}
 
 	// Get user context for RBAC
-	userContext := GetUserContext(c)
+	userContext := auth.GetUserContext(c)
 	userID, ok := userContext["id"].(string)
 	if !ok || userID == "" {
 		log.Printf("No user ID found in context for organizations request")

@@ -12,11 +12,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/like-mike/relai-gateway/shared/db"
 	"github.com/like-mike/relai-gateway/shared/models"
+	"github.com/like-mike/relai-gateway/ui/auth"
 )
 
 // SettingsHandler handles the main settings page
 func SettingsHandler(c *gin.Context) {
-	userData := GetUserContext(c)
+	userData := auth.GetUserContext(c)
 	userData["activePage"] = "settings"
 	userData["title"] = "Settings"
 
@@ -264,14 +265,14 @@ func UsersTableHandler(c *gin.Context) {
 // GetADGroupsHandler returns available Azure AD groups
 func GetADGroupsHandler(c *gin.Context) {
 	// Get Azure AD configuration
-	config := LoadAuthConfig()
+	config := auth.LoadConfig()
 	if !config.EnableAzureAD {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Azure AD integration is disabled"})
 		return
 	}
 
 	// Get access token for Microsoft Graph
-	accessToken, err := getAccessToken(config.AzureTenantID, config.AzureClientID, config.AzureClientSecret)
+	accessToken, err := auth.GetAccessToken(config.AzureTenantID, config.AzureClientID, config.AzureClientSecret)
 	if err != nil {
 		log.Printf("Failed to get access token: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to authenticate with Azure AD"})

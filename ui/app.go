@@ -10,7 +10,7 @@ import (
 	"github.com/like-mike/relai-gateway/shared/config"
 	"github.com/like-mike/relai-gateway/shared/db"
 	"github.com/like-mike/relai-gateway/shared/middleware"
-	uimw "github.com/like-mike/relai-gateway/ui/middleware"
+	"github.com/like-mike/relai-gateway/ui/auth"
 	"github.com/like-mike/relai-gateway/ui/routes/admin"
 	"github.com/like-mike/relai-gateway/ui/routes/health"
 )
@@ -18,7 +18,7 @@ import (
 func main() {
 	// Load environment variables
 	_ = godotenv.Load("../.env")
-	authConfig := admin.LoadAuthConfig()
+	authConfig := auth.LoadConfig()
 
 	// Load theme configuration
 	_, err := config.LoadConfig("../config.yml")
@@ -80,7 +80,7 @@ func main() {
 
 	// Dynamic theme CSS endpoint
 	r.GET("/theme.css", func(c *gin.Context) {
-		userData := admin.GetUserContext(c)
+		userData := auth.GetUserContext(c)
 		c.Header("Content-Type", "text/css")
 		c.HTML(http.StatusOK, "theme.css", userData)
 	})
@@ -89,7 +89,7 @@ func main() {
 	r.Static("/docs", "../docs")
 
 	// Register public authentication routes
-	admin.RegisterPublicAuthRoutes(r, authConfig)
+	auth.RegisterPublicRoutes(r, authConfig)
 
 	// Root route redirect
 	r.GET("/", func(c *gin.Context) {
@@ -98,32 +98,32 @@ func main() {
 
 	// Protected routes
 	authorized := r.Group("/")
-	authorized.Use(uimw.AuthMiddlewareGin())
-	admin.RegisterAuthRoutes(authorized, authConfig)
+	authorized.Use(auth.Middleware())
+	auth.RegisterRoutes(authorized, authConfig)
 
 	// Admin dashboard - API Keys page
 	authorized.GET("/admin", admin.DashboardHandler)
 	authorized.GET("/admin/models", func(c *gin.Context) {
-		userData := admin.GetUserContext(c)
+		userData := auth.GetUserContext(c)
 		userData["activePage"] = "models"
 		userData["title"] = "Models Management"
 		c.HTML(http.StatusOK, "models.html", userData)
 	})
 	authorized.GET("/admin/test-api", func(c *gin.Context) {
-		userData := admin.GetUserContext(c)
+		userData := auth.GetUserContext(c)
 		userData["activePage"] = "test_api"
 		userData["title"] = "Test API"
 		c.HTML(http.StatusOK, "test-api.html", userData)
 	})
 	authorized.GET("/admin/settings", admin.SettingsHandler)
 	authorized.GET("/admin/analytics", func(c *gin.Context) {
-		userData := admin.GetUserContext(c)
+		userData := auth.GetUserContext(c)
 		userData["activePage"] = "analytics"
 		userData["title"] = "Usage Analytics"
 		c.HTML(http.StatusOK, "analytics.html", userData)
 	})
 	authorized.GET("/admin/docs", func(c *gin.Context) {
-		userData := admin.GetUserContext(c)
+		userData := auth.GetUserContext(c)
 		userData["activePage"] = "docs"
 		userData["title"] = "API Documentation"
 		c.HTML(http.StatusOK, "docs.html", userData)
