@@ -11,6 +11,14 @@
         <div class="text-xs text-gray-800 break-words max-w-full whitespace-normal">{{.userEmail}}</div>
         <div class="text-xs text-gray-500 mt-1">{{.userRole}}</div>
       </div>
+      <button id="refreshAccessBtn" class="block w-full text-left px-4 py-2 text-sm text-gray-800 hover:bg-gray-100 border-b border-gray-100">
+        <div class="flex items-center space-x-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          <span>Refresh Access</span>
+        </div>
+      </button>
       <a href="/admin/logout" class="block px-4 py-2 text-sm text-gray-800 hover:bg-gray-100">Logout</a>
     </div>
   {{else}}
@@ -21,6 +29,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     const btn = document.getElementById('userDropdownBtn');
     const menu = document.getElementById('userDropdownMenu');
+    const refreshBtn = document.getElementById('refreshAccessBtn');
 
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -42,5 +51,72 @@
         menu.classList.add('hidden');
       }
     });
+
+    // Handle refresh access button
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Show loading state
+        const originalText = refreshBtn.innerHTML;
+        refreshBtn.innerHTML = `
+          <div class="flex items-center space-x-2">
+            <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span>Refreshing...</span>
+          </div>
+        `;
+        refreshBtn.disabled = true;
+
+        // Call the refresh access endpoint
+        fetch('/admin/refresh-access', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            // Show success message temporarily
+            refreshBtn.innerHTML = `
+              <div class="flex items-center space-x-2 text-green-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                <span>Access Updated</span>
+              </div>
+            `;
+            
+            // Close dropdown and reload page after a short delay to show updated roles/orgs
+            setTimeout(() => {
+              menu.classList.add('hidden');
+              window.location.reload();
+            }, 1500);
+          } else {
+            throw new Error(data.error || 'Failed to refresh access');
+          }
+        })
+        .catch(error => {
+          console.error('Error refreshing access:', error);
+          refreshBtn.innerHTML = `
+            <div class="flex items-center space-x-2 text-red-600">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+              <span>Refresh Failed</span>
+            </div>
+          `;
+          
+          // Reset button after error display
+          setTimeout(() => {
+            refreshBtn.innerHTML = originalText;
+            refreshBtn.disabled = false;
+          }, 2000);
+        });
+      });
+    }
   });
 </script>

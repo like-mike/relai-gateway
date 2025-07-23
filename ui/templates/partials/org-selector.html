@@ -222,6 +222,11 @@ function selectOrganization(orgId) {
   console.log('🔍 About to refresh API keys for org:', orgId);
   refreshApiKeys();
   
+  // Dispatch org changed event for other components
+  window.dispatchEvent(new CustomEvent('orgChanged', {
+    detail: { orgId: orgId, orgName: org.name }
+  }));
+  
   // Update filtered organizations to reflect selection
   renderFilteredOrganizations();
 }

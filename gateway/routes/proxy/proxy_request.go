@@ -13,20 +13,21 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/like-mike/relai-gateway/gateway/middleware"
-	"github.com/like-mike/relai-gateway/gateway/provider"
 	"github.com/like-mike/relai-gateway/shared/usage"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
-func prepareRequest(cfg *provider.ProxyConfig, c *gin.Context, target string) (*http.Request, []byte, error) {
+func prepareRequest(c *gin.Context, target string) (*middleware.AccessibleModel, *http.Request, []byte, error) {
+	var cfg *middleware.AccessibleModel
+
 	bodyBytes, _ := io.ReadAll(c.Request.Body)
 	c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
 	// 1. Detect the model requested in the body
 	modelName, err := DetectModel(bodyBytes)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to detect model: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to detect model: %w", err)
 	}
 
 	fmt.Println("Did you get this far? Model detected:", modelName)
@@ -34,34 +35,38 @@ func prepareRequest(cfg *provider.ProxyConfig, c *gin.Context, target string) (*
 	// 2. Get accessible models from auth middleware context
 	accessibleModelsInterface, exists := c.Get("accessible_models")
 	if !exists {
-		return nil, nil, fmt.Errorf("no accessible models found in context - authentication required")
+		return nil, nil, nil, fmt.Errorf("no accessible models found in context - authentication required")
 	}
 
 	accessibleModels, ok := accessibleModelsInterface.([]middleware.AccessibleModel)
 	if !ok {
-		return nil, nil, fmt.Errorf("invalid accessible models format in context")
+		return nil, nil, nil, fmt.Errorf("invalid accessible models format in context")
 	}
 
 	// 3. Check if organization has access to the requested model and get its API token
-	var modelApiToken string
-	var accessibleModelID string
+	// var modelApiToken string
+	// var accessibleModelID string
 	var hasAccess bool
 	for _, accessibleModel := range accessibleModels {
+
 		if accessibleModel.ModelID == modelName {
+			cfg = &accessibleModel // Use the current model in the loop
 			hasAccess = true
-			modelApiToken = accessibleModel.ApiToken
-			accessibleModelID = accessibleModel.ID
+			// modelApiToken = accessibleModel.ApiToken
+			// accessibleModelID = accessibleModel.ID
 			log.Printf("Organization has access to model %s (provider: %s)", modelName, accessibleModel.Provider)
 			break
 		}
 	}
 
+	log.Println("cfg", cfg)
+
 	if !hasAccess {
-		return nil, nil, fmt.Errorf("organization does not have access to model: %s", modelName)
+		return nil, nil, nil, fmt.Errorf("organization does not have access to model: %s", modelName)
 	}
 
 	// Store model ID in context for usage logging
-	c.Set("model_id", accessibleModelID)
+	c.Set("model_id", cfg.ModelID)
 
 	// Store request body for tokenizer fallback in streaming responses
 	c.Set("request_body", bodyBytes)
@@ -77,15 +82,17 @@ func prepareRequest(cfg *provider.ProxyConfig, c *gin.Context, target string) (*
 		log.Println("Using dummy backend for testing")
 		baseURL = os.Getenv("DUMMY_BACKEND_HOST")
 		if baseURL == "" {
-			return nil, nil, fmt.Errorf("DUMMY_BACKEND_HOST environment variable is not set")
+			return nil, nil, nil, fmt.Errorf("DUMMY_BACKEND_HOST environment variable is not set")
 		}
 	} else {
-		baseURL = cfg.BaseURL
+		baseURL = cfg.ApiEndpoint
 	}
 
+	// TODO: something here for when users enter /v1 in the ui, route already captures everything after host
+	log.Println("URL for model:", baseURL+target)
 	req, err := http.NewRequest(c.Request.Method, baseURL+target, io.NopCloser(bytes.NewReader(bodyBytes)))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Copy headers from original request
@@ -100,11 +107,11 @@ func prepareRequest(cfg *provider.ProxyConfig, c *gin.Context, target string) (*
 
 	// 5. Set the correct API token for the model (not dummy backend)
 	if dummyBackend != "1" {
-		req.Header.Set("Authorization", "Bearer "+modelApiToken)
+		req.Header.Set("Authorization", "Bearer "+cfg.ApiToken)
 		log.Printf("Using model-specific API token for %s", modelName)
 	}
 
-	return req, bodyBytes, nil
+	return cfg, req, bodyBytes, nil
 }
 
 type ChatCompletionRequest struct {
@@ -121,7 +128,7 @@ func DetectModel(jsonInput []byte) (string, error) {
 	return req.Model, nil
 }
 
-func writeDownstreamResponse(c *gin.Context, resp *http.Response, err error, tracer trace.Tracer, startTime time.Time) {
+func writeDownstreamResponse(cfg *middleware.AccessibleModel, c *gin.Context, resp *http.Response, err error, tracer trace.Tracer, startTime time.Time) {
 	_, span := tracer.Start(c.Request.Context(), "build_response")
 	defer span.End()
 
@@ -135,7 +142,7 @@ func writeDownstreamResponse(c *gin.Context, resp *http.Response, err error, tra
 		// Track the failed request
 		c.Status(http.StatusBadGateway)
 		errorResponse := []byte(`{"error": {"message": "failed to reach provider", "type": "gateway_error"}}`)
-		trackUsageFromResponse(c, errorResponse, startTime)
+		trackUsageFromResponse(cfg, c, errorResponse, startTime)
 		return
 	}
 	defer resp.Body.Close()
@@ -149,7 +156,7 @@ func writeDownstreamResponse(c *gin.Context, resp *http.Response, err error, tra
 		// Track the failed request
 		c.Status(http.StatusInternalServerError)
 		errorResponse := []byte(`{"error": {"message": "failed to read provider response", "type": "gateway_error"}}`)
-		trackUsageFromResponse(c, errorResponse, startTime)
+		trackUsageFromResponse(cfg, c, errorResponse, startTime)
 		return
 	}
 
@@ -185,7 +192,7 @@ func writeDownstreamResponse(c *gin.Context, resp *http.Response, err error, tra
 		isStreaming := strings.Contains(string(responseBody[:min(100, len(responseBody))]), "data:")
 		log.Printf("Response tracking - Length: %d, IsStreaming: %v, Status: %d", len(responseBody), isStreaming, resp.StatusCode)
 	}
-	trackUsageFromResponse(c, responseBody, startTime)
+	trackUsageFromResponse(cfg, c, responseBody, startTime)
 }
 
 // Helper function for min
@@ -197,20 +204,24 @@ func min(a, b int) int {
 }
 
 // trackUsageFromResponse extracts and tracks usage from the provider response
-func trackUsageFromResponse(c *gin.Context, responseBody []byte, startTime time.Time) {
+func trackUsageFromResponse(cfg *middleware.AccessibleModel, c *gin.Context, responseBody []byte, startTime time.Time) {
 	// Get context data for usage tracking
 	orgID, _ := c.Get("organization_id")
 	apiKeyID, _ := c.Get("api_key_id")
-	modelID, _ := c.Get("model_id")
 
-	orgIDStr, ok1 := orgID.(string)
-	apiKeyIDStr, ok2 := apiKeyID.(string)
-	modelIDStr, ok3 := modelID.(string)
+	// apiKeyID = cfg.
+	modelIDStr := cfg.ID
 
-	if !ok1 || !ok2 || !ok3 {
-		log.Printf("Missing required context for usage tracking: org=%v, apiKey=%v, model=%v", ok1, ok2, ok3)
-		return
-	}
+	orgIDStr, _ := orgID.(string)
+	apiKeyIDStr, _ := apiKeyID.(string)
+	// apiKeyIDStr := "empty"
+	// modelIDStr, ok3 := modelID.(string)
+
+	// if !ok1 || !ok3 {
+	// 	log.Printf("Missing required context for usage tracking: org=%v, apiKey=%v, model=%v", ok1, ok2, ok3)
+	// 	return
+	// }
+	log.Println("Tracking usage for org:", orgIDStr, "apiKey:", apiKeyIDStr, "model:", modelIDStr)
 
 	// Determine provider from accessible models
 	provider := "unknown"
@@ -218,6 +229,7 @@ func trackUsageFromResponse(c *gin.Context, responseBody []byte, startTime time.
 	if exists {
 		if accessibleModels, ok := accessibleModelsInterface.([]middleware.AccessibleModel); ok {
 			for _, model := range accessibleModels {
+				// log.Println("ID:", model.ID, "ModelID:", modelIDStr)
 				if model.ID == modelIDStr {
 					provider = model.Provider
 					break

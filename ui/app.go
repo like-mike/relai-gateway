@@ -55,6 +55,7 @@ func main() {
 		"templates/partials/quota-cards.html",
 		"templates/partials/api-keys-table.html",
 		"templates/partials/organizations-table.html",
+		"templates/partials/users-table.html",
 		"templates/components/modals/api-keys/new-key-modal.html",
 		"templates/components/modals/api-keys/view-key-modal.html",
 		"templates/components/modals/api-keys/delete-confirmation-modal.html",
@@ -140,6 +141,7 @@ func main() {
 	authorized.DELETE("/api/models/:id", admin.DeleteModelHandler)
 	authorized.POST("/api/models/:id/access", admin.ManageModelAccessHandler)
 	authorized.GET("/api/analytics/dashboard", admin.AnalyticsDashboardHandler)
+	authorized.POST("/api/completions-proxy", admin.CompletionsProxyHandler)
 
 	// Endpoints API routes
 	authorized.GET("/api/endpoints", admin.EndpointsHandler)
@@ -153,7 +155,10 @@ func main() {
 	authorized.POST("/admin/settings/organizations", admin.CreateOrganizationHandler)
 	authorized.GET("/admin/settings/organizations/:id", admin.GetOrganizationHandler)
 	authorized.PUT("/admin/settings/organizations/:id", admin.UpdateOrganizationHandler)
+	authorized.POST("/admin/settings/organizations/:id", admin.UpdateOrganizationHandler) // HTMX form support
 	authorized.DELETE("/admin/settings/organizations/:id", admin.DeleteOrganizationHandler)
+	authorized.GET("/admin/settings/users", admin.UsersTableHandler)
+	authorized.GET("/admin/settings/ad-groups", admin.GetADGroupsHandler)
 
 	// Run server
 	port := os.Getenv("UI_PORT")

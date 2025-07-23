@@ -21,6 +21,27 @@
         </div>
       </td>
       <td class="px-6 py-4 whitespace-nowrap">
+        <div class="text-xs text-gray-600">
+          {{if .AdAdminGroupName}}
+            <div class="mb-1">
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                Admin: {{.AdAdminGroupName}}
+              </span>
+            </div>
+          {{end}}
+          {{if .AdMemberGroupName}}
+            <div>
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                Member: {{.AdMemberGroupName}}
+              </span>
+            </div>
+          {{end}}
+          {{if and (not .AdAdminGroupName) (not .AdMemberGroupName)}}
+            <span class="text-gray-400">No AD groups</span>
+          {{end}}
+        </div>
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap">
         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full {{if .IsActive}}bg-green-100 text-green-800{{else}}bg-red-100 text-red-800{{end}}">
           {{if .IsActive}}Active{{else}}Inactive{{end}}
         </span>
@@ -38,7 +59,7 @@
     {{end}}
   {{else}}
     <tr>
-      <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+      <td colspan="7" class="px-6 py-8 text-center text-gray-500">
         <div class="flex flex-col items-center">
           <svg class="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
@@ -60,15 +81,93 @@ function editOrganization(orgId) {
       // Populate edit modal with organization data
       document.getElementById('edit-org-id').value = data.id;
       document.getElementById('edit-org-name').value = data.name;
-      document.getElementById('edit-org-description').value = data.description;
+      document.getElementById('edit-org-description').value = data.description || '';
       document.getElementById('edit-org-active').checked = data.is_active;
       
+      // Update the form action URL with the actual organization ID
+      const form = document.getElementById('edit-org-form');
+      const correctUrl = `/admin/settings/organizations/${data.id}`;
+      
+      // Remove old HTMX attributes completely first
+      form.removeAttribute('hx-put');
+      form.removeAttribute('hx-post');
+      
+      // Set new attributes
+      form.setAttribute('hx-post', correctUrl);
+      form.setAttribute('action', correctUrl);
+      
+      // Force HTMX to re-process the element
+      if (window.htmx) {
+        htmx.process(form);
+      }
+      
+      console.log('Setting form URL to:', correctUrl);
+      console.log('Form hx-post attribute:', form.getAttribute('hx-post'));
+      console.log('Form action attribute:', form.getAttribute('action'));
+      console.log('Form hx-put attribute (should be null):', form.getAttribute('hx-put'));
+      
+      // Load AD groups and then populate selections
+      loadEditADGroups(data);
+      
       // Open edit modal
-      document.getElementById('edit-org-modal').classList.remove('hidden');
+      openEditOrgModal();
     })
     .catch(error => {
       console.error('Error loading organization:', error);
       alert('Failed to load organization data');
+    });
+}
+
+function loadEditADGroups(orgData) {
+  fetch('/admin/settings/ad-groups')
+    .then(response => response.json())
+    .then(data => {
+      const adminSelect = document.getElementById('edit-org-admin-group-select');
+      const memberSelect = document.getElementById('edit-org-member-group-select');
+      
+      // Clear existing options (except first)
+      adminSelect.innerHTML = '<option value="">Select an Azure AD group for administrators...</option>';
+      memberSelect.innerHTML = '<option value="">Select an Azure AD group for members...</option>';
+      
+      // Populate dropdowns
+      data.groups.forEach(group => {
+        const adminOption = new Option(group.displayName, group.id);
+        const memberOption = new Option(group.displayName, group.id);
+        
+        // Select current values if they match
+        if (group.id === orgData.ad_admin_group_id) {
+          adminOption.selected = true;
+          document.getElementById('edit-org-admin-group-name').value = group.displayName;
+        }
+        if (group.id === orgData.ad_member_group_id) {
+          memberOption.selected = true;
+          document.getElementById('edit-org-member-group-name').value = group.displayName;
+        }
+        
+        adminSelect.add(adminOption);
+        memberSelect.add(memberOption);
+      });
+      
+      // Add change handlers to set hidden name fields
+      adminSelect.onchange = function() {
+        const selectedOption = this.options[this.selectedIndex];
+        const hiddenNameField = document.getElementById('edit-org-admin-group-name');
+        hiddenNameField.value = selectedOption.value ? selectedOption.text : '';
+        console.log('Admin group changed:', selectedOption.value, selectedOption.text);
+        console.log('Hidden admin name field value:', hiddenNameField.value);
+      };
+      
+      memberSelect.onchange = function() {
+        const selectedOption = this.options[this.selectedIndex];
+        const hiddenNameField = document.getElementById('edit-org-member-group-name');
+        hiddenNameField.value = selectedOption.value ? selectedOption.text : '';
+        console.log('Member group changed:', selectedOption.value, selectedOption.text);
+        console.log('Hidden member name field value:', hiddenNameField.value);
+      };
+    })
+    .catch(error => {
+      console.error('Error loading AD groups:', error);
+      // Continue without AD groups if there's an error
     });
 }
 

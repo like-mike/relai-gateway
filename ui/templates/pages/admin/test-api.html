@@ -20,14 +20,475 @@
     {{template "sidebar.html" .}}
 
     <!-- Main Content -->
-    <main class="flex-1 p-10 overflow-auto">
-      <h1 class="text-2xl font-bold text-gray-900 mb-6">Test API</h1>
+    <main class="flex-1 p-10 space-y-6 overflow-auto">
+      <h1 class="text-2xl font-bold text-gray-900">Test API</h1>
       
-      <!-- Test API content will go here -->
-      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <p class="text-gray-600">API testing interface coming soon...</p>
+      <!-- Organization Selector -->
+      {{template "org-selector.html" .}}
+        
+      <!-- Main Panel: Config left, Chat right -->
+      <div class="flex flex-row gap-8">
+        <!-- Configuration Panel -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full max-w-xs flex flex-col justify-start">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">Configuration</h2>
+          <!-- API Key Selection -->
+          <div class="mb-4">
+            <label for="api-key-select" class="block text-sm font-medium text-gray-700 mb-2">API Key</label>
+            <select id="api-key-select" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled>
+              <option value="">Select API key...</option>
+            </select>
+          </div>
+          <!-- Model Selection -->
+          <div class="mb-4">
+            <label for="model-select" class="block text-sm font-medium text-gray-700 mb-2">Model</label>
+            <select id="model-select" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled>
+              <option value="">Select a model...</option>
+            </select>
+          </div>
+          <!-- Streaming Toggle -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Streaming</label>
+            <div class="flex items-center">
+              <input type="checkbox" id="streaming-toggle" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+              <label for="streaming-toggle" class="ml-2 block text-sm text-gray-700">Enable streaming</label>
+            </div>
+          </div>
+          <!-- Clear Chat -->
+          <div class="mt-auto">
+            <button onclick="clearChat()" class="w-full px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors duration-200">
+              Clear Chat
+            </button>
+          </div>
+        </div>
+        <!-- Chat Interface -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col flex-1" style="height: 600px;">
+        <!-- Chat Header -->
+        <div class="border-b border-gray-200 p-4">
+          <h3 class="text-lg font-medium text-gray-900">Chat</h3>
+        </div>
+        
+        <!-- Messages Container -->
+        <div id="messages-container" class="flex-1 overflow-y-auto p-4 space-y-4">
+          <div class="text-center text-gray-500 text-sm">
+            Select an organization, API key, and model to start testing your API
+          </div>
+        </div>
+        
+        <!-- Input Area -->
+        <div class="border-t border-gray-200 p-4">
+          <div class="flex space-x-4">
+            <textarea 
+              id="message-input" 
+              placeholder="Type your message here..." 
+              class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+              rows="2"
+              onkeydown="handleInputKeydown(event)"></textarea>
+            <button 
+              id="send-button" 
+              onclick="sendMessage()" 
+              class="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+              disabled>
+              Send
+            </button>
+          </div>
+        </div>
       </div>
     </main>
+
+    <!-- JavaScript -->
+    <script>
+      let apiKeys = [];
+      let models = [];
+      let chatHistory = [];
+      let isLoading = false;
+
+      // Initialize the page
+      document.addEventListener('DOMContentLoaded', function() {
+        updateSendButtonState();
+        
+        // Listen for org changes from the org-selector partial
+        window.addEventListener('orgChanged', function(event) {
+          console.log('🔍 Test API: Received orgChanged event', event.detail);
+          const orgId = event.detail.orgId;
+          loadAPIKeys(orgId);
+          loadModels(orgId);
+          document.getElementById('api-key-select').disabled = false;
+          document.getElementById('model-select').disabled = false;
+        });
+        
+        // Initial load after org selector is ready
+        setTimeout(() => {
+          console.log('🔍 Test API: Initial load check, currentOrgId:', window.currentOrgId);
+          if (window.currentOrgId) {
+            loadAPIKeys(window.currentOrgId);
+            loadModels(window.currentOrgId);
+          }
+        }, 500);
+      });
+      
+      // Override refreshApiKeys function to also load models for this page
+      function refreshApiKeys() {
+        console.log('🔍 Test API: refreshApiKeys called, currentOrgId:', window.currentOrgId);
+        if (window.currentOrgId) {
+          loadAPIKeys(window.currentOrgId);
+          loadModels(window.currentOrgId);
+        }
+      }
+
+
+      // Load API keys for selected organization
+      async function loadAPIKeys(orgId) {
+        console.log('🔍 Test API: loadAPIKeys called with orgId:', orgId);
+        if (!orgId) {
+          console.log('🔍 Test API: No orgId, clearing API keys');
+          apiKeys = [];
+          populateAPIKeyDropdown();
+          return;
+        }
+
+        try {
+          let url = '/api-keys';
+          if (orgId) {
+            url += `?org_id=${orgId}`;
+          }
+          console.log('🔍 Test API: Fetching API keys from:', url);
+          
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            credentials: 'include'
+          });
+          
+          console.log('🔍 Test API: API keys response status:', response.status);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          console.log('🔍 Test API: API keys data:', data);
+          apiKeys = data.api_keys || [];
+          console.log('🔍 Test API: Loaded', apiKeys.length, 'API keys');
+          populateAPIKeyDropdown();
+        } catch (error) {
+          console.error('🔍 Test API: Error loading API keys:', error);
+          showError('Failed to load API keys: ' + error.message);
+        }
+      }
+
+      // Load available models for organization
+      async function loadModels(orgId = null) {
+        console.log('🔍 Test API: loadModels called with orgId:', orgId);
+        try {
+          let url = '/api/models';
+          if (orgId) {
+            url += `?org_id=${orgId}`;
+          }
+          console.log('🔍 Test API: Fetching models from:', url);
+          
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include'
+          });
+          
+          console.log('🔍 Test API: Models response status:', response.status);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          console.log('🔍 Test API: Models data:', data);
+          models = data.models || [];
+          console.log('🔍 Test API: Loaded', models.length, 'models');
+          populateModelDropdown();
+        } catch (error) {
+          console.error('🔍 Test API: Error loading models:', error);
+          showError('Failed to load models: ' + error.message);
+        }
+      }
+
+
+      // Populate the API key dropdown
+      function populateAPIKeyDropdown() {
+        console.log('🔍 Test API: populateAPIKeyDropdown called with', apiKeys.length, 'keys');
+        const select = document.getElementById('api-key-select');
+        if (!select) {
+          console.error('🔍 Test API: API key select element not found');
+          return;
+        }
+        
+        select.innerHTML = '<option value="">Select API key...</option>';
+        
+        if (!apiKeys.length) {
+            const noOption = document.createElement('option');
+            noOption.textContent = 'No API keys available';
+            select.appendChild(noOption);
+        }
+
+        apiKeys.forEach(key => {
+          console.log('🔍 Test API: Processing API key:', key);
+          const option = document.createElement('option');
+          option.value = key.id;
+          option.textContent = `${key.name} (${key.key})`;
+          select.appendChild(option);
+          console.log('🔍 Test API: Added API key option:', option.textContent);
+        });
+        
+        // Remove existing event listener to avoid duplicates
+        const newSelect = select.cloneNode(true);
+        select.parentNode.replaceChild(newSelect, select);
+        newSelect.addEventListener('change', updateSendButtonState);
+        console.log('🔍 Test API: API key dropdown populated with', select.children.length - 1, 'options');
+      }
+
+      // Populate the model dropdown
+      function populateModelDropdown() {
+        console.log('🔍 Test API: populateModelDropdown called with', models.length, 'models');
+        const select = document.getElementById('model-select');
+        if (!select) {
+          console.error('🔍 Test API: Model select element not found');
+          return;
+        }
+        
+        select.innerHTML = '<option value="">Select a model...</option>';
+        
+        models.forEach(model => {
+          console.log('🔍 Test API: Processing model:', model);
+          const option = document.createElement('option');
+          option.value = model.model_id || model.id;
+          option.textContent = `${model.name} (${model.provider})`;
+          select.appendChild(option);
+          console.log('🔍 Test API: Added model option:', option.textContent);
+        });
+        
+        // Remove existing event listener to avoid duplicates
+        const newSelect = select.cloneNode(true);
+        select.parentNode.replaceChild(newSelect, select);
+        newSelect.addEventListener('change', updateSendButtonState);
+        console.log('🔍 Test API: Model dropdown populated with', select.children.length - 1, 'options');
+      }
+
+      // Update send button state
+      function updateSendButtonState() {
+        const apiKeySelect = document.getElementById('api-key-select');
+        const modelSelect = document.getElementById('model-select');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        
+        const hasOrganization = window.currentOrgId !== null;
+        const hasAPIKey = apiKeySelect && apiKeySelect.value !== '';
+        const hasModel = modelSelect && modelSelect.value !== '';
+        const hasMessage = messageInput && messageInput.value.trim() !== '';
+        
+        if (sendButton) {
+          sendButton.disabled = !hasOrganization || !hasAPIKey || !hasModel || !hasMessage || isLoading;
+        }
+      }
+
+      // Handle input keydown
+      function handleInputKeydown(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          sendMessage();
+        }
+        updateSendButtonState();
+      }
+
+      // Send message
+      async function sendMessage() {
+        const apiKeySelect = document.getElementById('api-key-select');
+        const modelSelect = document.getElementById('model-select');
+        const messageInput = document.getElementById('message-input');
+        const streamingToggle = document.getElementById('streaming-toggle');
+        
+        if (!window.currentOrgId || !apiKeySelect.value || !modelSelect.value || !messageInput.value.trim() || isLoading) {
+          return;
+        }
+
+        const message = messageInput.value.trim();
+        const selectedOrganization = window.currentOrgId;
+        const selectedAPIKey = apiKeySelect.value;
+        const selectedModel = modelSelect.value;
+        const isStreaming = streamingToggle.checked;
+        
+        // Find the actual API key from our stored keys
+        const apiKey = apiKeys.find(key => key.id === selectedAPIKey);
+        if (!apiKey) {
+          showError('Selected API key not found');
+          return;
+        }
+        
+        // Add user message to chat
+        addMessage('user', message);
+        messageInput.value = '';
+        updateSendButtonState();
+        
+        // Prepare API request
+        const requestBody = {
+          model: selectedModel,
+          messages: [
+            ...chatHistory,
+            { role: 'user', content: message }
+          ],
+          stream: isStreaming
+        };
+
+        isLoading = true;
+        updateSendButtonState();
+
+        try {
+          const response = await fetch('/api/completions-proxy', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              organization_id: selectedOrganization,
+              api_key_id: selectedAPIKey,
+              model_id: selectedModel,
+              message: message,
+              stream: isStreaming
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          if (isStreaming) {
+            await handleStreamingResponse(response);
+          } else {
+            await handleNonStreamingResponse(response);
+          }
+
+          // Update chat history
+          chatHistory.push({ role: 'user', content: message });
+          
+        } catch (error) {
+          console.error('Error sending message:', error);
+          showError('Failed to send message: ' + error.message);
+        } finally {
+          isLoading = false;
+          updateSendButtonState();
+        }
+      }
+
+      // Handle non-streaming response
+      async function handleNonStreamingResponse(response) {
+        const data = await response.json();
+        const assistantMessage = data.choices?.[0]?.message?.content || 'No response';
+        addMessage('assistant', assistantMessage);
+        chatHistory.push({ role: 'assistant', content: assistantMessage });
+      }
+
+      // Handle streaming response
+      async function handleStreamingResponse(response) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let assistantMessage = '';
+        let messageElement = null;
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') continue;
+
+                try {
+                  const parsed = JSON.parse(data);
+                  const delta = parsed.choices?.[0]?.delta?.content;
+                  
+                  if (delta) {
+                    assistantMessage += delta;
+                    if (!messageElement) {
+                      messageElement = addMessage('assistant', '');
+                    }
+                    updateMessageContent(messageElement, assistantMessage);
+                  }
+                } catch (e) {
+                  // Skip invalid JSON
+                }
+              }
+            }
+          }
+          
+          if (assistantMessage) {
+            chatHistory.push({ role: 'assistant', content: assistantMessage });
+          }
+        } catch (error) {
+          console.error('Error reading stream:', error);
+          showError('Error reading streaming response: ' + error.message);
+        }
+      }
+
+      // Add message to chat
+      function addMessage(role, content) {
+        const container = document.getElementById('messages-container');
+        
+        // Remove the placeholder if it exists
+        const placeholder = container.querySelector('.text-center');
+        if (placeholder) {
+          placeholder.remove();
+        }
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+        
+        const messageContent = document.createElement('div');
+        messageContent.className = `max-w-3xl px-4 py-2 rounded-lg ${
+          role === 'user' 
+            ? 'bg-blue-600 text-white' 
+            : 'bg-gray-100 text-gray-900 border border-gray-200'
+        }`;
+        
+        const messageText = document.createElement('div');
+        messageText.className = role === 'user' ? 'text-white' : 'text-gray-900';
+        messageText.textContent = content;
+        
+        messageContent.appendChild(messageText);
+        messageDiv.appendChild(messageContent);
+        container.appendChild(messageDiv);
+        
+        // Scroll to bottom
+        container.scrollTop = container.scrollHeight;
+        
+        return messageText;
+      }
+
+      // Update message content (for streaming)
+      function updateMessageContent(element, content) {
+        element.textContent = content;
+        const container = document.getElementById('messages-container');
+        container.scrollTop = container.scrollHeight;
+      }
+
+      // Clear chat
+      function clearChat() {
+        const container = document.getElementById('messages-container');
+        container.innerHTML = '<div class="text-center text-gray-500 text-sm">Select an organization, API key, and model to start testing your API</div>';
+        chatHistory = [];
+      }
+
+      // Show error message
+      function showError(message) {
+        addMessage('system', `Error: ${message}`);
+      }
+
+      // Listen for input changes
+      document.getElementById('message-input').addEventListener('input', updateSendButtonState);
+    </script>
   </div>
 </body>
 </html>

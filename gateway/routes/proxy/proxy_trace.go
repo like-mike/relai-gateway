@@ -3,12 +3,12 @@ package proxy
 import (
 	"net/http"
 
-	"github.com/like-mike/relai-gateway/gateway/provider"
+	"github.com/like-mike/relai-gateway/gateway/middleware"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
-func recordTracingMetadata(cfg *provider.ProxyConfig, span, childSpan trace.Span, req *http.Request, body []byte) {
+func recordTracingMetadata(cfg *middleware.AccessibleModel, span, childSpan trace.Span, req *http.Request, body []byte) {
 	authHeader := req.Header.Get("Authorization")
 
 	span.SetAttributes(

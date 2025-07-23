@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/lib/pq"
 	"github.com/like-mike/relai-gateway/shared/models"
 )
 
@@ -38,16 +39,199 @@ func GetAllOrganizations(db *sql.DB) ([]models.Organization, error) {
 	return organizations, nil
 }
 
+// SyncUserOrganizationMemberships syncs user's organization memberships based on AD groups
+func SyncUserOrganizationMemberships(db *sql.DB, userID string, userADGroups []string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Get current user organization memberships
+	currentMemberships := make(map[string]string) // orgID -> roleType
+	membershipQuery := `
+		SELECT organization_id, role_name
+		FROM user_organizations
+		WHERE user_id = $1`
+
+	rows, err := tx.Query(membershipQuery, userID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var orgID, roleName string
+			if err := rows.Scan(&orgID, &roleName); err == nil {
+				currentMemberships[orgID] = roleName
+			}
+		}
+	}
+
+	// Get organization AD group mappings
+	// Changed to handle multiple roles per group: orgID -> {groupID -> []roleType}
+	orgMappings := make(map[string]map[string][]string) // orgID -> {groupID -> []roleType}
+
+	// Enhanced debug logging
+	fmt.Printf("=== SYNC DEBUG: Looking for organizations mapped to user's %d AD groups ===\n", len(userADGroups))
+	for i, group := range userADGroups {
+		fmt.Printf("User AD Group %d: %s\n", i+1, group)
+	}
+
+	// First, let's check what's actually in the organization_ad_groups table
+	debugQuery := `SELECT organization_id, ad_group_id, role_type FROM organization_ad_groups WHERE is_active = true`
+	debugRows, err := tx.Query(debugQuery)
+	if err == nil {
+		defer debugRows.Close()
+		fmt.Printf("=== All active AD group mappings in database: ===\n")
+		for debugRows.Next() {
+			var orgID, groupID, roleType string
+			if err := debugRows.Scan(&orgID, &groupID, &roleType); err == nil {
+				fmt.Printf("DB Mapping: Org=%s, Group=%s, Role=%s\n", orgID, groupID, roleType)
+			}
+		}
+	} else {
+		fmt.Printf("Error querying organization_ad_groups: %v\n", err)
+	}
+
+	mappingQuery := `
+		SELECT organization_id, ad_group_id, role_type
+		FROM organization_ad_groups
+		WHERE is_active = true AND ad_group_id = ANY($1)`
+
+	if len(userADGroups) > 0 {
+		fmt.Printf("Executing query with user groups: %v\n", userADGroups)
+		rows, err = tx.Query(mappingQuery, pq.Array(userADGroups))
+		if err != nil {
+			fmt.Printf("Error in AD group mapping query: %v\n", err)
+		} else {
+			defer rows.Close()
+			matchCount := 0
+			for rows.Next() {
+				var orgID, groupID, roleType string
+				if err := rows.Scan(&orgID, &groupID, &roleType); err == nil {
+					if orgMappings[orgID] == nil {
+						orgMappings[orgID] = make(map[string][]string)
+					}
+					orgMappings[orgID][groupID] = append(orgMappings[orgID][groupID], roleType)
+					matchCount++
+					fmt.Printf("MATCHED: User group %s -> Org %s with role %s\n", groupID, orgID, roleType)
+				}
+			}
+			fmt.Printf("Total matches found: %d\n", matchCount)
+		}
+	} else {
+		fmt.Printf("No user AD groups to check\n")
+	}
+
+	// Determine new memberships based on AD groups
+	newMemberships := make(map[string]string) // orgID -> roleType
+	fmt.Printf("=== PROCESSING NEW MEMBERSHIPS ===\n")
+
+	for orgID, groupMappings := range orgMappings {
+		fmt.Printf("Processing organization: %s\n", orgID)
+		userRolesInOrg := []string{} // Collect all roles user has in this org
+
+		for groupID, roleTypes := range groupMappings {
+			fmt.Printf("  Checking group %s with roles %v\n", groupID, roleTypes)
+			for _, userGroup := range userADGroups {
+				if userGroup == groupID {
+					fmt.Printf("  USER MATCH: User is in group %s, found roles %v\n", groupID, roleTypes)
+					userRolesInOrg = append(userRolesInOrg, roleTypes...)
+				}
+			}
+		}
+
+		// Now determine the highest privilege role for this organization
+		if len(userRolesInOrg) > 0 {
+			finalRole := "member" // default to lowest privilege
+			for _, role := range userRolesInOrg {
+				if role == "admin" {
+					finalRole = "admin" // admin always wins
+					break
+				}
+			}
+			fmt.Printf("  FINAL ROLE for org %s: %s (from roles: %v)\n", orgID, finalRole, userRolesInOrg)
+			newMemberships[orgID] = finalRole
+		}
+	}
+
+	fmt.Printf("=== FINAL NEW MEMBERSHIPS ===\n")
+	for orgID, roleType := range newMemberships {
+		fmt.Printf("Org %s -> Role %s\n", orgID, roleType)
+	}
+
+	// Remove user from organizations they should no longer be in
+	for orgID := range currentMemberships {
+		if _, shouldBeIn := newMemberships[orgID]; !shouldBeIn {
+			_, err = tx.Exec(`DELETE FROM user_organizations WHERE user_id = $1 AND organization_id = $2`, userID, orgID)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Add or update user memberships for organizations they should be in
+	for orgID, roleType := range newMemberships {
+		// Insert or update membership using role_name directly
+		_, err = tx.Exec(`
+			INSERT INTO user_organizations (user_id, organization_id, role_name)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (user_id, organization_id)
+			DO UPDATE SET role_name = EXCLUDED.role_name`, userID, orgID, roleType)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// GetUserOrganizationMemberships gets user's current organization memberships
+func GetUserOrganizationMemberships(db *sql.DB, userID string) (map[string]string, error) {
+	memberships := make(map[string]string) // orgID -> roleName
+
+	query := `
+		SELECT o.id, o.name, uo.role_name
+		FROM user_organizations uo
+		JOIN organizations o ON uo.organization_id = o.id
+		WHERE uo.user_id = $1 AND o.is_active = true`
+
+	rows, err := db.Query(query, userID)
+	if err != nil {
+		return memberships, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var orgID, orgName, roleName string
+		if err := rows.Scan(&orgID, &orgName, &roleName); err == nil {
+			memberships[orgID] = roleName
+		}
+	}
+
+	return memberships, nil
+}
+
+// GetAPIKeyByID fetches an API key by its ID
+func GetAPIKeyByID(db *sql.DB, id string) (string, error) {
+	var apiKey string
+	err := db.QueryRow(`SELECT api_key FROM api_keys WHERE id = $1`, id).Scan(&apiKey)
+	if err != nil {
+		return "", err
+	}
+	return apiKey, nil
+}
+
 // GetOrganizationByID retrieves a single organization by ID
 func GetOrganizationByID(db *sql.DB, id string) (*models.Organization, error) {
 	query := `
-		SELECT id, name, description, is_active, created_at, updated_at
+		SELECT id, name, description, is_active, created_at, updated_at,
+		       ad_admin_group_id, ad_admin_group_name, ad_member_group_id, ad_member_group_name
 		FROM organizations
 		WHERE id = $1`
 
 	var org models.Organization
 	err := db.QueryRow(query, id).Scan(
 		&org.ID, &org.Name, &org.Description, &org.IsActive, &org.CreatedAt, &org.UpdatedAt,
+		&org.AdAdminGroupID, &org.AdAdminGroupName, &org.AdMemberGroupID, &org.AdMemberGroupName,
 	)
 	if err != nil {
 		return nil, err
@@ -682,15 +866,58 @@ func generateAPIKey() (fullKey, prefix string, err error) {
 	return fullKey, prefix, nil
 }
 
-// UserOperations
-func GetUserByUsername(db *sql.DB, username string) (*models.User, error) {
-	query := `SELECT id, username, email, password_hash, is_active, last_login, created_at, updated_at 
-			  FROM users 
-			  WHERE username = $1 AND is_active = true`
+// RBAC User Operations
+func GetUserByAzureOID(db *sql.DB, azureOID string) (*models.User, error) {
+	query := `SELECT id, azure_oid, email, name, is_active, last_login, created_at, updated_at
+		      FROM users
+		      WHERE azure_oid = $1 AND is_active = true`
 
 	var user models.User
-	err := db.QueryRow(query, username).Scan(
-		&user.ID, &user.Username, &user.Email, &user.PasswordHash,
+	err := db.QueryRow(query, azureOID).Scan(
+		&user.ID, &user.AzureOID, &user.Email, &user.Name,
+		&user.IsActive, &user.LastLogin, &user.CreatedAt, &user.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func GetUserByEmail(db *sql.DB, email string) (*models.User, error) {
+	query := `SELECT id, azure_oid, email, name, is_active, last_login, created_at, updated_at
+		      FROM users
+		      WHERE email = $1 AND is_active = true`
+
+	var user models.User
+	err := db.QueryRow(query, email).Scan(
+		&user.ID, &user.AzureOID, &user.Email, &user.Name,
+		&user.IsActive, &user.LastLogin, &user.CreatedAt, &user.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func CreateOrUpdateUser(db *sql.DB, req models.CreateUserRequest) (*models.User, error) {
+	query := `
+		INSERT INTO users (azure_oid, email, name)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (azure_oid)
+		DO UPDATE SET
+			email = EXCLUDED.email,
+			name = EXCLUDED.name,
+			last_login = NOW(),
+			updated_at = NOW()
+		RETURNING id, azure_oid, email, name, is_active, last_login, created_at, updated_at`
+
+	var user models.User
+	err := db.QueryRow(query, req.AzureOID, req.Email, req.Name).Scan(
+		&user.ID, &user.AzureOID, &user.Email, &user.Name,
 		&user.IsActive, &user.LastLogin, &user.CreatedAt, &user.UpdatedAt,
 	)
 
@@ -705,6 +932,52 @@ func UpdateUserLastLogin(db *sql.DB, userID string) error {
 	query := `UPDATE users SET last_login = NOW(), updated_at = NOW() WHERE id = $1`
 	_, err := db.Exec(query, userID)
 	return err
+}
+
+func GetUserByID(db *sql.DB, userID string) (*models.User, error) {
+	query := `SELECT id, azure_oid, email, name, is_active, last_login, created_at, updated_at
+		      FROM users
+		      WHERE id = $1`
+
+	var user models.User
+	err := db.QueryRow(query, userID).Scan(
+		&user.ID, &user.AzureOID, &user.Email, &user.Name,
+		&user.IsActive, &user.LastLogin, &user.CreatedAt, &user.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func AssignUserToOrganization(db *sql.DB, userID, orgID, roleName string, createdBy *string) error {
+	query := `
+		INSERT INTO user_organizations (user_id, organization_id, role_name, created_by)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (user_id, organization_id)
+		DO UPDATE SET role_name = EXCLUDED.role_name, created_by = EXCLUDED.created_by`
+
+	_, err := db.Exec(query, userID, orgID, roleName, createdBy)
+	return err
+}
+
+func AssignSystemRole(db *sql.DB, userID, roleID string, createdBy *string) error {
+	query := `
+		INSERT INTO user_system_roles (user_id, role_id, created_by)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (user_id, role_id) DO NOTHING`
+
+	_, err := db.Exec(query, userID, roleID, createdBy)
+	return err
+}
+
+// Legacy user function for backwards compatibility
+func GetUserByUsername(db *sql.DB, username string) (*models.LegacyUser, error) {
+	// This function is kept for backwards compatibility but should not be used in new code
+	// The new RBAC system uses Azure OID instead of username
+	return nil, fmt.Errorf("legacy user lookup not supported in RBAC system")
 }
 
 // Endpoints operations
@@ -1066,3 +1339,108 @@ func CheckOrganizationQuota(db *sql.DB, orgID string) (bool, int64, int64, error
 	hasQuota := usedTokens < totalQuota
 	return hasQuota, usedTokens, totalQuota, nil
 }
+
+// GetUsersWithOrganizations fetches all users with their organization memberships
+func GetUsersWithOrganizations(db *sql.DB) ([]models.UserWithOrganizations, error) {
+	query := `
+		SELECT
+			u.id, u.azure_oid, u.email, u.name, u.is_active, u.last_login, u.created_at, u.updated_at,
+			COALESCE(
+				JSON_AGG(
+					JSON_BUILD_OBJECT(
+						'org_id', o.id,
+						'org_name', o.name,
+						'role_name', uo.role_name
+					) ORDER BY o.name
+				) FILTER (WHERE o.id IS NOT NULL),
+				'[]'::json
+			) as organizations
+		FROM users u
+		LEFT JOIN user_organizations uo ON u.id = uo.user_id
+		LEFT JOIN organizations o ON uo.organization_id = o.id AND o.is_active = true
+		GROUP BY u.id, u.azure_oid, u.email, u.name, u.is_active, u.last_login, u.created_at, u.updated_at
+		ORDER BY u.name`
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []models.UserWithOrganizations
+	for rows.Next() {
+		var user models.UserWithOrganizations
+		var orgsJSON string
+
+		err := rows.Scan(
+			&user.ID, &user.AzureOID, &user.Email, &user.Name,
+			&user.IsActive, &user.LastLogin, &user.CreatedAt, &user.UpdatedAt,
+			&orgsJSON,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Parse organizations JSON
+		var orgMemberships []models.UserOrgMembership
+		if err := json.Unmarshal([]byte(orgsJSON), &orgMemberships); err != nil {
+			return nil, err
+		}
+		user.Organizations = orgMemberships
+
+		users = append(users, user)
+	}
+
+	return users, nil
+}
+
+// GetUsersByOrganization fetches users for a specific organization
+func GetUsersByOrganization(db *sql.DB, orgID string) ([]models.UserWithOrganizations, error) {
+	query := `
+		SELECT
+			u.id, u.azure_oid, u.email, u.name, u.is_active, u.last_login, u.created_at, u.updated_at,
+			JSON_BUILD_OBJECT(
+				'org_id', o.id,
+				'org_name', o.name,
+				'role_name', uo.role_name
+			) as organization
+		FROM users u
+		JOIN user_organizations uo ON u.id = uo.user_id
+		JOIN organizations o ON uo.organization_id = o.id
+		WHERE o.id = $1 AND o.is_active = true
+		ORDER BY u.name`
+
+	rows, err := db.Query(query, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []models.UserWithOrganizations
+	for rows.Next() {
+		var user models.UserWithOrganizations
+		var orgJSON string
+
+		err := rows.Scan(
+			&user.ID, &user.AzureOID, &user.Email, &user.Name,
+			&user.IsActive, &user.LastLogin, &user.CreatedAt, &user.UpdatedAt,
+			&orgJSON,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Parse single organization
+		var orgMembership models.UserOrgMembership
+		if err := json.Unmarshal([]byte(orgJSON), &orgMembership); err != nil {
+			return nil, err
+		}
+		user.Organizations = []models.UserOrgMembership{orgMembership}
+
+		users = append(users, user)
+	}
+
+	return users, nil
+}
+
+// GetAPIKeyByID fetches an API key by its ID

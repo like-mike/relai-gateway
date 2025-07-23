@@ -11,17 +11,16 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/like-mike/relai-gateway/gateway/provider"
-	"github.com/like-mike/relai-gateway/shared/models"
+	"github.com/like-mike/relai-gateway/gateway/middleware"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 )
 
 // createHTTPClientForModel creates an HTTP client with model-specific timeout
-func createHTTPClientForModel(model *models.Model) *http.Client {
+func createHTTPClientForModel(cfg *middleware.AccessibleModel) *http.Client {
 	timeout := 30 * time.Second // default timeout
-	if model != nil && model.TimeoutSeconds != nil {
-		timeout = time.Duration(*model.TimeoutSeconds) * time.Second
+	if cfg.ModelID != "" && cfg.TimeoutSeconds != nil {
+		timeout = time.Duration(*cfg.TimeoutSeconds) * time.Second
 	}
 
 	return &http.Client{
@@ -36,22 +35,22 @@ func createHTTPClientForModel(model *models.Model) *http.Client {
 }
 
 // makeRequestWithRetry executes HTTP request with model-specific retry logic
-func makeRequestWithRetry(client *http.Client, req *http.Request, bodyBytes []byte, model *models.Model) (*http.Response, error) {
+func makeRequestWithRetry(client *http.Client, req *http.Request, bodyBytes []byte, cfg *middleware.AccessibleModel) (*http.Response, error) {
 	// Default retry settings
 	maxRetries := 2
 	retryDelay := 1000 * time.Millisecond
 	backoffMultiplier := 2.0
 
 	// Use model-specific settings if available
-	if model != nil {
-		if model.MaxRetries != nil {
-			maxRetries = *model.MaxRetries
+	if cfg.ID != "" {
+		if cfg.MaxRetries != nil {
+			maxRetries = *cfg.MaxRetries
 		}
-		if model.RetryDelayMs != nil {
-			retryDelay = time.Duration(*model.RetryDelayMs) * time.Millisecond
+		if cfg.RetryDelayMs != nil {
+			retryDelay = time.Duration(*cfg.RetryDelayMs) * time.Millisecond
 		}
-		if model.BackoffMultiplier != nil {
-			backoffMultiplier = *model.BackoffMultiplier
+		if cfg.BackoffMultiplier != nil {
+			backoffMultiplier = *cfg.BackoffMultiplier
 		}
 	}
 
@@ -126,30 +125,30 @@ func Handler(c *gin.Context) {
 	}
 
 	// Check for custom endpoints first
-	customEndpoint := checkForCustomEndpoint(c, path)
-	var model *models.Model
-	var cfg *provider.ProxyConfig
+	// customEndpoint := checkForCustomEndpoint(c, path)
+	// var model *models.Model
+	// var cfg *provider.ProxyConfig
 
-	if customEndpoint != nil {
-		log.Printf("Using custom endpoint: %s for path: %s", customEndpoint.Name, path)
-		// Get the model from database
-		if customEndpoint.PrimaryModelID != nil {
-			model = getModelByID(c, *customEndpoint.PrimaryModelID)
-		}
-		// Update the target path to remove the custom prefix and use standard API paths
-		target = convertCustomPathToStandard(path, customEndpoint.PathPrefix, target)
-	} else {
-		// For non-custom endpoints, we could look up model by other means
-		// For now, use default - this could be enhanced to parse model from request
-		model = nil
-	}
+	// if customEndpoint != nil {
+	// 	log.Printf("Using custom endpoint: %s for path: %s", customEndpoint.Name, path)
+	// 	// Get the model from database
+	// 	if customEndpoint.PrimaryModelID != nil {
+	// 		model = getModelByID(c, *customEndpoint.PrimaryModelID)
+	// 	}
+	// 	// Update the target path to remove the custom prefix and use standard API paths
+	// 	target = convertCustomPathToStandard(path, customEndpoint.PathPrefix, target)
+	// } else {
+	// 	// For non-custom endpoints, we could look up model by other means
+	// 	// For now, use default - this could be enhanced to parse model from request
+	// 	model = nil
+	// }
 
 	// Create provider config from model (or use default if no model)
-	fmt.Println("Creating proxy config from model:", model)
-	cfg = provider.CreateProxyConfigFromModel(model)
+
+	// cfg = provider.CreateProxyConfigFromModel(model)
 
 	// Build proxy request
-	req, bodyBytes, err := prepareRequest(cfg, c, target)
+	cfg, req, bodyBytes, err := prepareRequest(c, target)
 	if err != nil {
 		c.String(http.StatusInternalServerError, err.Error())
 		return
@@ -167,18 +166,16 @@ func Handler(c *gin.Context) {
 	// Send request with model-specific retry/timeout
 	start := time.Now()
 
-	// Create client with model-specific timeout
-	fmt.Println("here's the thing", model)
-	client := createHTTPClientForModel(model)
+	client := createHTTPClientForModel(cfg)
 
 	// Execute request with retry logic
-	resp, err := makeRequestWithRetry(client, req, bodyBytes, model)
+	resp, err := makeRequestWithRetry(client, req, bodyBytes, cfg)
 
 	duration := time.Since(start).Milliseconds()
 	spanInvoke.SetAttributes(attribute.Int64("llm.request.duration_ms", duration))
 
 	// Build response
-	writeDownstreamResponse(c, resp, err, tracer, start)
+	writeDownstreamResponse(cfg, c, resp, err, tracer, start)
 }
 
 // CustomEndpoint represents a custom endpoint from the database
@@ -263,56 +260,56 @@ func checkForCustomEndpoint(c *gin.Context, path string) *CustomEndpoint {
 // which uses the full model data from the database instead of hardcoded configs
 
 // convertCustomPathToStandard converts custom endpoint paths to standard API paths
-func convertCustomPathToStandard(originalPath, customPrefix, target string) string {
-	// Remove the custom prefix and convert to standard OpenAI API path
-	// Example: /api/chat/completions -> /v1/chat/completions
-	// Example: /api/custom-assistant/completions -> /v1/chat/completions
+// func convertCustomPathToStandard(originalPath, customPrefix, target string) string {
+// 	// Remove the custom prefix and convert to standard OpenAI API path
+// 	// Example: /api/chat/completions -> /v1/chat/completions
+// 	// Example: /api/custom-assistant/completions -> /v1/chat/completions
 
-	standardPath := strings.Replace(originalPath, "/api/"+customPrefix, "/v1", 1)
+// 	standardPath := strings.Replace(originalPath, "/api/"+customPrefix, "/v1", 1)
 
-	// If the path doesn't have a specific endpoint, default to chat/completions
-	if standardPath == "/v1" || standardPath == "/v1/" {
-		standardPath = "/v1/chat/completions"
-	}
+// 	// If the path doesn't have a specific endpoint, default to chat/completions
+// 	if standardPath == "/v1" || standardPath == "/v1/" {
+// 		standardPath = "/v1/chat/completions"
+// 	}
 
-	// Update the target with the new path
-	if strings.Contains(target, "?") {
-		parts := strings.Split(target, "?")
-		return standardPath + "?" + parts[1]
-	}
+// 	// Update the target with the new path
+// 	if strings.Contains(target, "?") {
+// 		parts := strings.Split(target, "?")
+// 		return standardPath + "?" + parts[1]
+// 	}
 
-	return standardPath
-}
+// 	return standardPath
+// }
 
 // getModelByID retrieves a model from the database by ID
-func getModelByID(c *gin.Context, modelID string) *models.Model {
-	database, exists := c.Get("db")
-	if !exists {
-		return nil
-	}
+// func getModelByID(c *gin.Context, modelID string) *models.Model {
+// 	database, exists := c.Get("db")
+// 	if !exists {
+// 		return nil
+// 	}
 
-	sqlDB, ok := database.(*sql.DB)
-	if !ok {
-		return nil
-	}
+// 	sqlDB, ok := database.(*sql.DB)
+// 	if !ok {
+// 		return nil
+// 	}
 
-	query := `SELECT id, name, description, provider, model_id, api_endpoint, api_token,
-	          input_cost_per_1m, output_cost_per_1m, max_retries, timeout_seconds,
-	          retry_delay_ms, backoff_multiplier, is_active, created_at, updated_at
-			  FROM models WHERE id = $1 AND is_active = true`
+// 	query := `SELECT id, name, description, provider, model_id, api_endpoint, api_token,
+// 	          input_cost_per_1m, output_cost_per_1m, max_retries, timeout_seconds,
+// 	          retry_delay_ms, backoff_multiplier, is_active, created_at, updated_at
+// 			  FROM models WHERE id = $1 AND is_active = true`
 
-	var model models.Model
-	err := sqlDB.QueryRow(query, modelID).Scan(
-		&model.ID, &model.Name, &model.Description, &model.Provider,
-		&model.ModelID, &model.APIEndpoint, &model.APIToken,
-		&model.InputCostPer1M, &model.OutputCostPer1M,
-		&model.MaxRetries, &model.TimeoutSeconds, &model.RetryDelayMs, &model.BackoffMultiplier,
-		&model.IsActive, &model.CreatedAt, &model.UpdatedAt,
-	)
-	if err != nil {
-		log.Printf("Error getting model %s: %v", modelID, err)
-		return nil
-	}
+// 	var model models.Model
+// 	err := sqlDB.QueryRow(query, modelID).Scan(
+// 		&model.ID, &model.Name, &model.Description, &model.Provider,
+// 		&model.ModelID, &model.APIEndpoint, &model.APIToken,
+// 		&model.InputCostPer1M, &model.OutputCostPer1M,
+// 		&model.MaxRetries, &model.TimeoutSeconds, &model.RetryDelayMs, &model.BackoffMultiplier,
+// 		&model.IsActive, &model.CreatedAt, &model.UpdatedAt,
+// 	)
+// 	if err != nil {
+// 		log.Printf("Error getting model %s: %v", modelID, err)
+// 		return nil
+// 	}
 
-	return &model
-}
+// 	return &model
+// }

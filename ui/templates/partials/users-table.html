@@ -1,0 +1,65 @@
+{{if .error}}
+  <tr>
+    <td colspan="7" class="px-6 py-4 text-center text-red-500">
+      {{.error}}
+    </td>
+  </tr>
+{{else if .users}}
+  {{range .users}}
+  <tr class="hover:bg-gray-50">
+    <td class="px-6 py-4 whitespace-nowrap">
+      <div class="flex items-center">
+        <div class="flex-shrink-0 h-8 w-8">
+          <div class="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+            <svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="ml-4">
+          <div class="text-sm font-medium text-gray-900">{{.Name}}</div>
+          <div class="text-xs text-gray-500">{{.AzureOID}}</div>
+        </div>
+      </div>
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap">
+      <div class="text-sm text-gray-900">{{.Email}}</div>
+    </td>
+    <td class="px-6 py-4">
+      {{if .Organizations}}
+        <div class="space-y-1">
+          {{range .Organizations}}
+            <div class="flex items-center space-x-2">
+              <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                {{.OrgName}}
+              </span>
+              <span class="text-xs text-gray-500">as</span>
+              <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full {{if eq .RoleName "admin"}}bg-purple-100 text-purple-800{{else}}bg-gray-100 text-gray-800{{end}}">
+                {{if eq .RoleName "admin"}}Admin{{else}}Member{{end}}
+              </span>
+            </div>
+          {{end}}
+        </div>
+      {{else}}
+        <span class="text-sm text-gray-500 italic">No organizations</span>
+      {{end}}
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap">
+      {{if .LastLogin}}
+        <div class="text-sm text-gray-900">{{.LastLogin.Format "2006-01-02 15:04"}}</div>
+      {{else}}
+        <span class="text-sm text-gray-500">Never</span>
+      {{end}}
+    </td>
+    
+    
+  </tr>
+  {{end}}
+{{else}}
+  <tr>
+    <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+      No users found.
+    </td>
+  </tr>
+{{end}}
+

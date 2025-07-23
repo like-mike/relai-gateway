@@ -121,6 +121,7 @@ func main() {
 	protected := r.Group("/")
 	protected.Use(middleware.APIKeyAuth())
 	{
+		// Removed completions proxy endpoint registration
 		// Add any other protected endpoints here in the future
 	}
 

@@ -1,13 +1,81 @@
 -- RelAI Gateway Database Schema
 
+-- Users table for Azure AD user persistence
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    azure_oid VARCHAR(255) UNIQUE NOT NULL, -- Azure Object ID
+    email VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    last_login TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Roles table
+CREATE TABLE IF NOT EXISTS roles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(50) UNIQUE NOT NULL,
+    description TEXT,
+    is_system_role BOOLEAN DEFAULT FALSE, -- True for System Admin
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Organizations table
 CREATE TABLE IF NOT EXISTS organizations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     description TEXT,
     is_active BOOLEAN DEFAULT true,
+    ad_admin_group_id VARCHAR(255), -- AD group for org admins
+    ad_admin_group_name VARCHAR(255),
+    ad_member_group_id VARCHAR(255), -- AD group for org members
+    ad_member_group_name VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- User-Organization relationships (Org Admins and Members)
+CREATE TABLE IF NOT EXISTS user_organizations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    role_name VARCHAR(50) NOT NULL, -- Direct role name: 'admin' or 'member'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_by UUID REFERENCES users(id),
+    UNIQUE(user_id, organization_id)
+);
+
+-- System-level user roles (System Admins)
+CREATE TABLE IF NOT EXISTS user_system_roles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role_id UUID NOT NULL REFERENCES roles(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_by UUID REFERENCES users(id),
+    UNIQUE(user_id, role_id)
+);
+
+-- Organization AD Group mappings
+CREATE TABLE IF NOT EXISTS organization_ad_groups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    ad_group_id VARCHAR(255) NOT NULL,
+    ad_group_name VARCHAR(255),
+    role_type VARCHAR(50) NOT NULL, -- 'admin' or 'member'
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(organization_id, ad_group_id, role_type)
+);
+
+-- System-level AD Group mappings (for System Admins)
+CREATE TABLE IF NOT EXISTS system_ad_groups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ad_group_id VARCHAR(255) UNIQUE NOT NULL,
+    ad_group_name VARCHAR(255),
+    role_id UUID NOT NULL REFERENCES roles(id),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- API Keys table (using raw API keys)
@@ -18,6 +86,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
     api_key VARCHAR(255) NOT NULL UNIQUE,
     is_active BOOLEAN DEFAULT true,
     last_used TIMESTAMP WITH TIME ZONE,
+    created_by_user_id UUID REFERENCES users(id), -- Link API keys to users
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -68,9 +137,23 @@ CREATE TABLE IF NOT EXISTS endpoints (
 );
 
 -- Indexes for performance
+-- RBAC indexes
+CREATE INDEX IF NOT EXISTS idx_users_azure_oid ON users(azure_oid);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_user_organizations_user_id ON user_organizations(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_organizations_org_id ON user_organizations(organization_id);
+CREATE INDEX IF NOT EXISTS idx_user_system_roles_user_id ON user_system_roles(user_id);
+CREATE INDEX IF NOT EXISTS idx_organization_ad_groups_org_id ON organization_ad_groups(organization_id);
+CREATE INDEX IF NOT EXISTS idx_organization_ad_groups_ad_group_id ON organization_ad_groups(ad_group_id);
+CREATE INDEX IF NOT EXISTS idx_system_ad_groups_ad_group_id ON system_ad_groups(ad_group_id);
+CREATE INDEX IF NOT EXISTS idx_organizations_ad_admin_group ON organizations(ad_admin_group_id);
+CREATE INDEX IF NOT EXISTS idx_organizations_ad_member_group ON organizations(ad_member_group_id);
+
+-- Existing indexes
 CREATE INDEX IF NOT EXISTS idx_api_keys_api_key ON api_keys(api_key);
 CREATE INDEX IF NOT EXISTS idx_api_keys_organization_id ON api_keys(organization_id);
 CREATE INDEX IF NOT EXISTS idx_api_keys_is_active ON api_keys(is_active);
+CREATE INDEX IF NOT EXISTS idx_api_keys_created_by_user_id ON api_keys(created_by_user_id);
 CREATE INDEX IF NOT EXISTS idx_models_model_id ON models(model_id);
 CREATE INDEX IF NOT EXISTS idx_models_is_active ON models(is_active);
 CREATE INDEX IF NOT EXISTS idx_model_org_access_model_id ON model_organization_access(model_id);
@@ -79,8 +162,15 @@ CREATE INDEX IF NOT EXISTS idx_endpoints_organization_id ON endpoints(organizati
 CREATE INDEX IF NOT EXISTS idx_endpoints_path_prefix ON endpoints(path_prefix);
 CREATE INDEX IF NOT EXISTS idx_endpoints_is_active ON endpoints(is_active);
 
+-- Insert default roles
+INSERT INTO roles (id, name, description, is_system_role) VALUES
+('00000000-0000-0000-0000-000000000001', 'System Admin', 'Global administrator with access to all organizations', true),
+('00000000-0000-0000-0000-000000000002', 'Org Admin', 'Organization administrator with full access within their organization', false),
+('00000000-0000-0000-0000-000000000003', 'Org Member', 'Organization member with limited access to own resources', false)
+ON CONFLICT (id) DO NOTHING;
+
 -- Insert default organization
-INSERT INTO organizations (id, name, description) 
+INSERT INTO organizations (id, name, description)
 VALUES ('00000000-0000-0000-0000-000000000001', 'Default Organization', 'Default organization for initial setup')
 ON CONFLICT (id) DO NOTHING;
 
