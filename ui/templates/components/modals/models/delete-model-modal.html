@@ -121,8 +121,9 @@ function openDeleteModelModal(model) {
 }
 
 function populateDeleteModelInfo(model) {
+  console.log('DELETE MODAL DEBUG - Model object:', model); // Debug log
   document.getElementById('delete-model-name').textContent = model.name || 'Unnamed Model';
-  document.getElementById('delete-model-type').textContent = model.type || 'Unknown Type';
+  document.getElementById('delete-model-type').textContent = model.provider || model.model_id || 'Unknown Type';
   
   // Populate organizations
   const orgsContainer = document.getElementById('delete-model-orgs');
@@ -212,7 +213,12 @@ function handleDeleteModelOverlayClick(event) {
 }
 
 async function confirmDeleteModel() {
-  if (!currentDeletingModel) return;
+  if (!currentDeletingModel) {
+    console.error('DELETE DEBUG - No currentDeletingModel available');
+    return;
+  }
+  
+  console.log('DELETE DEBUG - Starting deletion for model:', currentDeletingModel);
   
   // Show loading state
   const confirmBtn = document.getElementById('confirm-delete-model-btn');
@@ -221,7 +227,10 @@ async function confirmDeleteModel() {
   confirmBtn.disabled = true;
   
   try {
-    const response = await fetch(`/api/models/${currentDeletingModel.id}`, {
+    const deleteUrl = `/api/models/${currentDeletingModel.id}`;
+    console.log('DELETE DEBUG - Making DELETE request to:', deleteUrl);
+    
+    const response = await fetch(deleteUrl, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -229,17 +238,25 @@ async function confirmDeleteModel() {
       credentials: 'include'
     });
     
+    console.log('DELETE DEBUG - Response status:', response.status);
+    console.log('DELETE DEBUG - Response ok:', response.ok);
+    
     if (!response.ok) {
       const errorData = await response.json();
+      console.error('DELETE DEBUG - Error response:', errorData);
       throw new Error(errorData.error || 'Failed to delete model');
     }
     
+    const successData = await response.json();
+    console.log('DELETE DEBUG - Success response:', successData);
+    
     // Success - close modal and reload models
+    console.log('DELETE DEBUG - Closing modal and reloading models');
     closeDeleteModelModal();
     loadModels();
     
   } catch (error) {
-    console.error('Failed to delete model:', error);
+    console.error('DELETE DEBUG - Caught error:', error);
     alert(`Failed to delete model: ${error.message}`);
     
     // Restore button state

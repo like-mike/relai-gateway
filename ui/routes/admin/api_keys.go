@@ -635,3 +635,94 @@ func TestStreamingHandler(c *gin.Context) {
 
 	log.Printf("TestStreamingHandler: Response complete")
 }
+
+func RegenerateAPIKeyHandler(c *gin.Context) {
+	// Get database connection from context
+	database, exists := c.Get("db")
+	if !exists {
+		log.Printf("Database connection not found in context")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
+	}
+
+	sqlDB, ok := database.(*sql.DB)
+	if !ok {
+		log.Printf("Invalid database connection type")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
+	}
+
+	// Get user context for RBAC
+	userContext := auth.GetUserContext(c)
+	userID, ok := userContext["id"].(string)
+	if !ok || userID == "" {
+		log.Printf("No user ID found in context for regenerate API key request")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User authentication required"})
+		return
+	}
+
+	// Get user's organization memberships for RBAC
+	memberships, err := db.GetUserOrganizationMemberships(sqlDB, userID)
+	if err != nil {
+		log.Printf("Failed to get user memberships: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load user permissions"})
+		return
+	}
+
+	// Get API key ID from URL parameter
+	keyID := c.Param("id")
+	if keyID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "API key ID is required"})
+		return
+	}
+
+	// Get all API keys to find the one we want to regenerate and check its organization
+	allAPIKeys, err := db.GetAPIKeysWithOrganizations(sqlDB)
+	if err != nil {
+		log.Printf("Failed to get API keys for validation: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate API key"})
+		return
+	}
+
+	// Find the API key and validate organization access
+	var targetAPIKey *models.APIKey
+	for _, apiKey := range allAPIKeys {
+		if apiKey.ID == keyID {
+			targetAPIKey = &apiKey
+			break
+		}
+	}
+
+	if targetAPIKey == nil {
+		log.Printf("API key %s not found", keyID)
+		c.JSON(http.StatusNotFound, gin.H{"error": "API key not found"})
+		return
+	}
+
+	// Validate user has access to the API key's organization
+	if _, hasAccess := memberships[targetAPIKey.OrganizationID]; !hasAccess {
+		log.Printf("User %s denied access to regenerate API key from organization %s", userID, targetAPIKey.OrganizationID)
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied to organization"})
+		return
+	}
+
+	// Regenerate the API key
+	log.Printf("Regenerating API key %s for user %s", keyID, userID)
+	response, err := db.RegenerateAPIKey(sqlDB, keyID)
+	if err != nil {
+		log.Printf("Failed to regenerate API key: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to regenerate API key"})
+		return
+	}
+
+	log.Printf("API key regenerated successfully: %s", keyID)
+
+	// Return success response with the new key for modal display
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": response.Message,
+		"newKey":  response.FullKey,
+		"keyName": response.APIKey.Name,
+		"keyId":   response.APIKey.ID,
+	})
+}

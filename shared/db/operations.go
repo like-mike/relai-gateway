@@ -245,10 +245,12 @@ func GetAPIKeysWithOrganizations(db *sql.DB) ([]models.APIKey, error) {
 	query := `
 		SELECT
 			ak.id, ak.name, ak.organization_id, ak.is_active,
-			ak.last_used, ak.created_at, ak.updated_at,
-			o.name as org_name
+			ak.last_used, ak.created_at, ak.updated_at, ak.created_by_user_id,
+			o.name as org_name,
+			u.id as user_id, u.name as user_name, u.email as user_email
 		FROM api_keys ak
 		JOIN organizations o ON ak.organization_id = o.id
+		LEFT JOIN users u ON ak.created_by_user_id = u.id
 		WHERE ak.is_active = true
 		ORDER BY ak.created_at DESC`
 
@@ -262,10 +264,12 @@ func GetAPIKeysWithOrganizations(db *sql.DB) ([]models.APIKey, error) {
 	for rows.Next() {
 		var key models.APIKey
 		var orgName string
+		var userID, userName, userEmail sql.NullString
 
 		err := rows.Scan(
 			&key.ID, &key.Name, &key.OrganizationID, &key.IsActive,
-			&key.LastUsed, &key.CreatedAt, &key.UpdatedAt, &orgName,
+			&key.LastUsed, &key.CreatedAt, &key.UpdatedAt, &key.UserID,
+			&orgName, &userID, &userName, &userEmail,
 		)
 		if err != nil {
 			return nil, err
@@ -280,6 +284,15 @@ func GetAPIKeysWithOrganizations(db *sql.DB) ([]models.APIKey, error) {
 			Name: orgName,
 		}
 
+		// Attach user info if available
+		if userID.Valid && userName.Valid && userEmail.Valid {
+			key.User = &models.User{
+				ID:    userID.String,
+				Name:  userName.String,
+				Email: userEmail.String,
+			}
+		}
+
 		apiKeys = append(apiKeys, key)
 	}
 
@@ -290,10 +303,12 @@ func GetAPIKeysByOrganization(db *sql.DB, orgID string) ([]models.APIKey, error)
 	query := `
 		SELECT
 			ak.id, ak.name, ak.organization_id, ak.is_active,
-			ak.last_used, ak.created_at, ak.updated_at,
-			o.name as org_name
+			ak.last_used, ak.created_at, ak.updated_at, ak.created_by_user_id,
+			o.name as org_name,
+			u.id as user_id, u.name as user_name, u.email as user_email
 		FROM api_keys ak
 		JOIN organizations o ON ak.organization_id = o.id
+		LEFT JOIN users u ON ak.created_by_user_id = u.id
 		WHERE ak.is_active = true AND ak.organization_id = $1
 		ORDER BY ak.created_at DESC`
 
@@ -307,10 +322,12 @@ func GetAPIKeysByOrganization(db *sql.DB, orgID string) ([]models.APIKey, error)
 	for rows.Next() {
 		var key models.APIKey
 		var orgName string
+		var userID, userName, userEmail sql.NullString
 
 		err := rows.Scan(
 			&key.ID, &key.Name, &key.OrganizationID, &key.IsActive,
-			&key.LastUsed, &key.CreatedAt, &key.UpdatedAt, &orgName,
+			&key.LastUsed, &key.CreatedAt, &key.UpdatedAt, &key.UserID,
+			&orgName, &userID, &userName, &userEmail,
 		)
 		if err != nil {
 			return nil, err
@@ -323,6 +340,15 @@ func GetAPIKeysByOrganization(db *sql.DB, orgID string) ([]models.APIKey, error)
 		key.Organization = &models.Organization{
 			ID:   key.OrganizationID,
 			Name: orgName,
+		}
+
+		// Attach user info if available
+		if userID.Valid && userName.Valid && userEmail.Valid {
+			key.User = &models.User{
+				ID:    userID.String,
+				Name:  userName.String,
+				Email: userEmail.String,
+			}
 		}
 
 		apiKeys = append(apiKeys, key)
@@ -339,12 +365,12 @@ func CreateAPIKey(db *sql.DB, req models.CreateAPIKeyRequest) (*models.CreateAPI
 	}
 
 	query := `
-		INSERT INTO api_keys (name, organization_id, api_key)
-		VALUES ($1, $2, $3)
+		INSERT INTO api_keys (name, organization_id, api_key, created_by_user_id)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id, created_at, updated_at`
 
 	var apiKey models.APIKey
-	err = db.QueryRow(query, req.Name, req.OrganizationID, fullKey).Scan(&apiKey.ID, &apiKey.CreatedAt, &apiKey.UpdatedAt)
+	err = db.QueryRow(query, req.Name, req.OrganizationID, fullKey, req.UserID).Scan(&apiKey.ID, &apiKey.CreatedAt, &apiKey.UpdatedAt)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API key: %w", err)
@@ -355,6 +381,7 @@ func CreateAPIKey(db *sql.DB, req models.CreateAPIKeyRequest) (*models.CreateAPI
 	apiKey.Description = req.Description
 	apiKey.KeyPrefix = keyPrefix
 	apiKey.OrganizationID = req.OrganizationID
+	apiKey.UserID = req.UserID
 	apiKey.IsActive = true
 
 	// Get organization name
@@ -364,6 +391,19 @@ func CreateAPIKey(db *sql.DB, req models.CreateAPIKeyRequest) (*models.CreateAPI
 		apiKey.Organization = &models.Organization{
 			ID:   req.OrganizationID,
 			Name: orgName,
+		}
+	}
+
+	// Get creator user information if UserID is provided
+	if req.UserID != nil {
+		var userEmail, userName string
+		err = db.QueryRow("SELECT email, name FROM users WHERE id = $1", *req.UserID).Scan(&userEmail, &userName)
+		if err == nil {
+			apiKey.User = &models.User{
+				ID:    *req.UserID,
+				Name:  userName,
+				Email: userEmail,
+			}
 		}
 	}
 
@@ -380,13 +420,88 @@ func DeleteAPIKey(db *sql.DB, keyID string) error {
 	return err
 }
 
+func RegenerateAPIKey(db *sql.DB, keyID string) (*models.CreateAPIKeyResponse, error) {
+	// Start a transaction for atomic operation
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// First, get the existing API key information
+	var existingKey models.APIKey
+	var orgName string
+	query := `
+		SELECT ak.id, ak.name, ak.organization_id, ak.is_active, ak.created_at,
+		       o.name as org_name
+		FROM api_keys ak
+		JOIN organizations o ON ak.organization_id = o.id
+		WHERE ak.id = $1 AND ak.is_active = true`
+
+	err = tx.QueryRow(query, keyID).Scan(
+		&existingKey.ID, &existingKey.Name,
+		&existingKey.OrganizationID, &existingKey.IsActive, &existingKey.CreatedAt,
+		&orgName,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("API key not found or inactive")
+		}
+		return nil, fmt.Errorf("failed to retrieve API key: %w", err)
+	}
+
+	// Generate a new secure API key
+	fullKey, keyPrefix, err := generateAPIKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate new API key: %w", err)
+	}
+
+	// Update the existing key with the new key value
+	updateQuery := `
+		UPDATE api_keys
+		SET api_key = $1, updated_at = NOW()
+		WHERE id = $2 AND is_active = true`
+
+	result, err := tx.Exec(updateQuery, fullKey, keyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update API key: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("failed to check update result: %w", err)
+	}
+	if rowsAffected == 0 {
+		return nil, fmt.Errorf("API key not found or already inactive")
+	}
+
+	// Commit the transaction
+	if err = tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	// Prepare the response with updated information
+	existingKey.KeyPrefix = keyPrefix
+	existingKey.Organization = &models.Organization{
+		ID:   existingKey.OrganizationID,
+		Name: orgName,
+	}
+
+	return &models.CreateAPIKeyResponse{
+		APIKey:  existingKey,
+		FullKey: fullKey,
+		Message: "API key regenerated successfully",
+	}, nil
+}
+
 // Models operations
 func GetModelsWithOrganizations(db *sql.DB) ([]models.Model, error) {
-	// First get all models
+	// First get all active models (exclude soft-deleted ones)
 	query := `SELECT id, name, description, provider, model_id, api_endpoint, api_token,
 	          input_cost_per_1m, output_cost_per_1m, max_retries, timeout_seconds,
 	          retry_delay_ms, backoff_multiplier, is_active, created_at, updated_at
 			  FROM models
+			  WHERE is_active = true
 			  ORDER BY name`
 
 	rows, err := db.Query(query)

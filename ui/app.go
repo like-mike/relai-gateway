@@ -141,6 +141,7 @@ func main() {
 	authorized.GET("/quota", admin.GetQuotaHandler)
 	authorized.GET("/api-keys", admin.APIKeysHandler)
 	authorized.POST("/api/keys", admin.CreateAPIKeyHandler)
+	authorized.POST("/api/keys/:id/regenerate", admin.RegenerateAPIKeyHandler)
 	authorized.DELETE("/api/keys/:id", admin.DeleteAPIKeyHandler)
 	authorized.GET("/api/organizations", admin.OrganizationsHandler)
 	authorized.GET("/api/models", admin.ModelsHandler)

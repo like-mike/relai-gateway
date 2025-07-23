@@ -14,7 +14,7 @@
       </td>
       <td class="px-3 py-4 whitespace-nowrap">
         <div class="text-sm text-gray-900">
-          {{if .UserID}}{{.UserID}}{{else}}System{{end}}
+          {{if .User}}{{.User.Email}}{{else}}System{{end}}
         </div>
       </td>
       <td class="px-3 py-4 whitespace-nowrap">
@@ -30,7 +30,8 @@
       </td>
       <td class="px-3 py-4 whitespace-nowrap text-right text-sm font-medium">
         <div class="flex items-center space-x-2">
-          <button onclick="viewKey('{{.ID}}')" class="text-blue-600 hover:text-blue-900">View</button>
+          <!-- <button onclick="viewKey('{{.ID}}')" class="text-blue-600 hover:text-blue-900">View</button> -->
+          <button onclick="regenerateKey('{{.ID}}', '{{.Name}}')" class="text-green-600 hover:text-green-900">Refresh Key</button>
           <button onclick="deleteKey('{{.ID}}')" class="text-red-600 hover:text-red-900">Delete</button>
         </div>
       </td>
@@ -122,10 +123,10 @@ function openModalNow(modal, modalContainer, form) {
     form.setAttribute('hx-post', '/api/keys');
   }
   
-  // Set the user ID in the hidden field (hardcoded for now)
+  // Remove the user ID field since it's handled by the server from authentication context
   const userIdField = document.getElementById('user-id');
   if (userIdField) {
-    userIdField.value = 'Admin'; // Simple string ID
+    userIdField.value = ''; // Let server handle from auth context
   }
   
   // Show modal
@@ -302,6 +303,227 @@ document.addEventListener('DOMContentLoaded', function() {
     createNewKeyModal();
   }
 });
+
+function regenerateKey(keyId, keyName) {
+  // Show confirmation modal
+  showRegenerateConfirmationModal(keyId, keyName);
+}
+
+function showRegenerateConfirmationModal(keyId, keyName) {
+  const confirmationModalHTML = `
+    <div id="regenerate-confirmation-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ease-out">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 transform transition-all duration-300 ease-out">
+        <div class="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 class="text-xl font-bold text-red-900">⚠️ Regenerate API Key</h2>
+          <button type="button" class="text-gray-400 hover:text-gray-600" onclick="closeRegenerateConfirmationModal()">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="p-6">
+          <div class="flex items-center mb-4">
+            <svg class="w-12 h-12 text-red-500 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.734 0L3.732 16c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">Critical Security Warning</h3>
+              <p class="text-sm text-gray-600">This action cannot be undone</p>
+            </div>
+          </div>
+          
+          <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <div class="flex">
+              <svg class="w-5 h-5 text-red-400 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.734 0L3.732 16c-.77.833.192 2.5 1.732 2.5z"></path>
+              </svg>
+              <div>
+                <h4 class="text-sm font-medium text-red-800">Immediate Service Interruption</h4>
+                <p class="text-sm text-red-700 mt-1">The current API key will become invalid <strong>immediately</strong> upon regeneration. Any applications using this key will lose access until updated with the new key.</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mb-4">
+            <p class="text-sm font-medium text-gray-700 mb-2">API Key to Regenerate:</p>
+            <div class="p-3 bg-gray-100 rounded-lg">
+              <span class="font-mono text-sm text-gray-900">${keyName}</span>
+            </div>
+          </div>
+          
+          <div class="mb-4">
+            <p class="text-sm text-gray-600">
+              ✓ A new secure API key will be generated<br>
+              ✓ The old key will be invalidated immediately<br>
+              ✓ You will be shown the new key only once<br>
+              ⚠️ Update all applications before proceeding
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center justify-end space-x-3 p-6 border-t border-gray-200">
+          <button type="button" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg" onclick="closeRegenerateConfirmationModal()">Cancel</button>
+          <button type="button" class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg" onclick="confirmRegenerate('${keyId}', '${keyName}')">Yes, Regenerate Key</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', confirmationModalHTML);
+}
+
+function closeRegenerateConfirmationModal() {
+  const modal = document.getElementById('regenerate-confirmation-modal');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+function confirmRegenerate(keyId, keyName) {
+  // Close confirmation modal
+  closeRegenerateConfirmationModal();
+  
+  // Get current organization ID from localStorage or global variable
+  const selectedOrgId = localStorage.getItem('selectedOrgId') || window.currentOrgId;
+  
+  // Build URL
+  const url = `/api/keys/${keyId}/regenerate`;
+  
+  // Show loading state
+  showLoadingModal();
+  
+  // Send POST request to regenerate
+  fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include'
+  })
+  .then(response => response.json())
+  .then(data => {
+    hideLoadingModal();
+    if (data.success) {
+      // Show success modal with new key
+      showRegenerateSuccessModal(data.newKey, data.keyName, data.message);
+      // Refresh the API keys table
+      refreshAPIKeysTable();
+    } else {
+      alert('Error: ' + (data.error || 'Unknown error'));
+    }
+  })
+  .catch(error => {
+    hideLoadingModal();
+    console.error('Error regenerating API key:', error);
+    alert('Failed to regenerate API key');
+  });
+}
+
+function showLoadingModal() {
+  const loadingModalHTML = `
+    <div id="loading-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-xl shadow-2xl p-6">
+        <div class="flex items-center">
+          <svg class="animate-spin h-8 w-8 text-blue-600 mr-3" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span class="text-lg font-medium text-gray-900">Regenerating API key...</span>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', loadingModalHTML);
+}
+
+function hideLoadingModal() {
+  const modal = document.getElementById('loading-modal');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+function showRegenerateSuccessModal(newKey, keyName, message) {
+  const successModalHTML = `
+    <div id="regenerate-success-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ease-out">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 transform transition-all duration-300 ease-out">
+        <div class="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 class="text-xl font-bold text-green-900">🔑 API Key Regenerated Successfully!</h2>
+          <button type="button" class="text-gray-400 hover:text-gray-600" onclick="closeRegenerateSuccessModal()">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="p-6">
+          <div class="flex items-center mb-4">
+            <svg class="w-12 h-12 text-green-500 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">${keyName}</h3>
+              <p class="text-sm text-gray-600">${message}</p>
+            </div>
+          </div>
+          
+          <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <div class="flex">
+              <svg class="w-5 h-5 text-red-400 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.734 0L3.732 16c-.77.833.192 2.5 1.732 2.5z"></path>
+              </svg>
+              <div>
+                <h4 class="text-sm font-medium text-red-800">One-Time Display</h4>
+                <p class="text-sm text-red-700 mt-1">This is the only time you'll be able to view this new API key. Copy it now and store it securely. The old key is now invalid.</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Your New API Key:</label>
+            <div class="flex">
+              <input type="text" id="regenerated-key" value="${newKey}" readonly class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg bg-gray-50 font-mono text-sm">
+              <button onclick="copyRegeneratedKey()" class="px-4 py-2 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                Copy
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center justify-end space-x-3 p-6 border-t border-gray-200">
+          <button type="button" class="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg" onclick="closeRegenerateSuccessModal()">I've Copied the New Key</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', successModalHTML);
+}
+
+function closeRegenerateSuccessModal() {
+  const modal = document.getElementById('regenerate-success-modal');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+function copyRegeneratedKey() {
+  const keyInput = document.getElementById('regenerated-key');
+  keyInput.select();
+  keyInput.setSelectionRange(0, 99999);
+  document.execCommand('copy');
+  
+  // Show feedback
+  const button = event.target;
+  const originalText = button.textContent;
+  button.textContent = 'Copied!';
+  button.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+  button.classList.add('bg-green-600');
+  
+  setTimeout(() => {
+    button.textContent = originalText;
+    button.classList.remove('bg-green-600');
+    button.classList.add('bg-blue-600', 'hover:bg-blue-700');
+  }, 2000);
+}
 
 function createNewKeyModal() {
   const modalHTML = `
