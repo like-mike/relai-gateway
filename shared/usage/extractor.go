@@ -214,10 +214,6 @@ func (e *OpenAIExtractor) isPrintableText(data []byte) bool {
 	return float64(printableCount)/float64(len(data)) > 0.7 // 70% printable characters
 }
 
-// extractFromStreamingResponse has been removed - use tiktoken_extractor.go instead
-// This function is no longer used since we simplified the streaming approach
-// Streaming responses now use tiktoken for direct token counting
-
 // AnthropicExtractor extracts usage from Anthropic API responses
 type AnthropicExtractor struct{}
 

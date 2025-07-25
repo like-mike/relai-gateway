@@ -218,9 +218,16 @@ function selectOrganization(orgId) {
   // Close dropdown
   closeOrgDropdown();
   
-  // Refresh API keys for selected organization
-  console.log('🔍 About to refresh API keys for org:', orgId);
+  // Refresh components for selected organization with proper timing
+  console.log('🔍 About to refresh components for org:', orgId);
+  
+  // First refresh API keys
   refreshApiKeys();
+  
+  // Wait a moment before refreshing quota cards to avoid race conditions
+  setTimeout(() => {
+    refreshQuotaCards();
+  }, 150);
   
   // Dispatch org changed event for other components
   window.dispatchEvent(new CustomEvent('orgChanged', {
@@ -319,6 +326,35 @@ function refreshApiKeys() {
   htmx.ajax('GET', url, {
     target: '#api-keys-table',
     swap: 'outerHTML'
+  });
+}
+
+function refreshQuotaCards() {
+  // Trigger HTMX refresh of quota cards with organization filter
+  const quotaCards = document.getElementById('quota-cards');
+  
+  if (!quotaCards) {
+    console.warn('Quota cards element not found');
+    return;
+  }
+  
+  // Build URL with organization filter - ensure currentOrgId is valid
+  let url = '/quota';
+  if (currentOrgId && currentOrgId !== 'null' && currentOrgId !== 'undefined') {
+    url += `?org_id=${encodeURIComponent(currentOrgId)}`;
+    console.log('Refreshing quota cards for org:', currentOrgId, 'URL:', url);
+  } else {
+    console.log('Refreshing quota cards without org filter');
+  }
+  
+  // Use htmx.ajax for direct request
+  htmx.ajax('GET', url, {
+    target: '#quota-cards',
+    swap: 'outerHTML'
+  }).then(() => {
+    console.log('Quota cards refreshed successfully');
+  }).catch((error) => {
+    console.error('Failed to refresh quota cards:', error);
   });
 }
 

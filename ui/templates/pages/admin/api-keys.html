@@ -27,7 +27,7 @@
       <!-- Quota Cards -->
       <div id="quota-cards"
            hx-get="/quota"
-           hx-trigger="load"
+           hx-trigger="load, orgChanged from:window"
            hx-target="#quota-cards"
            hx-swap="outerHTML"
            class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
